@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ASCON Promotion Examination</title>
 <link rel="stylesheet" href="assets/app.css">
+<style>
+  /* Exam integrity: block text selection/copy, but keep form fields usable */
+  body{ -webkit-user-select:none; -moz-user-select:none; user-select:none; }
+  input, textarea{ -webkit-user-select:text; -moz-user-select:text; user-select:text; }
+  img{ -webkit-user-drag:none; user-drag:none; pointer-events:none; }
+</style>
 </head>
 <body>
 
@@ -118,6 +124,23 @@
 <script>
 (function(){
   var A = window.ASCON, esc = A.esc;
+
+  /* -------- exam-integrity lockdown (deterrent layer) -------- */
+  (function lockdown(){
+    document.addEventListener('contextmenu', function(e){ e.preventDefault(); });         // right-click
+    ['copy','cut','paste'].forEach(function(ev){ document.addEventListener(ev, function(e){ e.preventDefault(); }); });
+    document.addEventListener('dragstart', function(e){ e.preventDefault(); });
+    document.addEventListener('keydown', function(e){
+      var K = (e.key || '').toUpperCase();
+      // F12 / dev tools
+      if (K === 'F12') { e.preventDefault(); return; }
+      if (e.ctrlKey && e.shiftKey && ['I','J','C'].indexOf(K) >= 0) { e.preventDefault(); return; }
+      if (e.metaKey && e.altKey && ['I','J','C'].indexOf(K) >= 0) { e.preventDefault(); return; } // mac
+      // view-source / save / print / copy / cut / select-all
+      if ((e.ctrlKey || e.metaKey) && ['U','S','P','C','X','A'].indexOf(K) >= 0) { e.preventDefault(); return; }
+    });
+  })();
+
   var S = {};                 // session state
   var LS_KEY = 'ascon_session';
 
@@ -133,12 +156,13 @@
   document.getElementById('b-username').onclick = function(){
     var u = document.getElementById('u').value.trim();
     if(!u){ err('username','Please enter your username.'); return; }
-    clearErr('username'); this.disabled=true; this.textContent='Checking…';
-    A.api('candidateLogin',{username:u}).then(function(r){
-      S.username=u; document.getElementById('pw-hello').textContent = r.full_name ? ('Signing in as '+r.full_name) : '';
-      show('password'); document.getElementById('p').focus();
-    }).catch(function(e){ err('username', e.message); })
-      .finally(function(){ var b=document.getElementById('b-username'); b.disabled=false; b.textContent='Continue'; });
+    clearErr('username');
+    // Advance immediately — no server round-trip here. The single sign-in call
+    // on the next page validates the username and password together, so login
+    // is one request instead of two.
+    S.username = u;
+    document.getElementById('pw-hello').textContent = 'Enter the password for “'+u+'”.';
+    show('password'); document.getElementById('p').focus();
   };
   document.getElementById('u').addEventListener('keydown',function(e){ if(e.key==='Enter') document.getElementById('b-username').click(); });
   document.getElementById('b-back').onclick=function(){ show('username'); };

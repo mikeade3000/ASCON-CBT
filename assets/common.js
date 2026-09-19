@@ -9,9 +9,17 @@
     payload.action = action;
     return fetch(CFG.API_URL, {
       method: 'POST',
+      redirect: 'follow',
       body: JSON.stringify(payload)   // no custom headers -> text/plain -> no preflight
-    }).then(function (r) { return r.json(); })
-      .then(function (j) {
+    }).then(function (r) { return r.text(); })
+      .then(function (text) {
+        var j;
+        try { j = JSON.parse(text); }
+        catch (e) {
+          // The server returned HTML (a Google sign-in / error page) instead of JSON.
+          // Almost always a deployment-access problem, not a candidate problem.
+          throw new Error('Could not reach the exam service. Please check your connection and try again. If this continues, the administrator needs to re-publish the Apps Script with access set to “Anyone”.');
+        }
         if (j && j.error) throw new Error(j.error);
         return j;
       });
