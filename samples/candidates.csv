@@ -1,0 +1,4 @@
+exam_taker_id,username,password,full_name,present_post,promotion_post,promotion_grade_level,exam_location
+ASC001,officer001,Pass@001,Aisha Bello,Administrative Officer II,Administrative Officer I,GL 09,"ASCON Topo, Badagry"
+ASC002,officer002,Pass@002,Chidi Okonkwo,Senior Executive Officer,Higher Administrative Officer,GL 10,"ASCON Topo, Badagry"
+ASC003,officer003,Pass@003,Fatima Sani,Principal Executive Officer II,Principal Executive Officer I,GL 12,ASCON Lagos Annex

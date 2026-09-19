@@ -1,0 +1,10 @@
+question_id,area,question_text,option_a,option_b,option_c,option_d,correct_answer,marks
+Q001,Public Administration,"Which principle emphasises neutrality of the civil service?",Anonymity,Partisanship,Nepotism,Favouritism,A,1
+Q002,Public Administration,"The highest career post in a Nigerian federal ministry is the?",Minister,Permanent Secretary,Director,Perm Rep,B,1
+Q003,Management,"PPBS in budgeting stands for Planning, Programming, Budgeting and?",Scheduling,System,Staffing,Sequencing,B,1
+Q004,Management,"Span of control refers to the number of subordinates a manager can?",Employ,Effectively supervise,Promote,Dismiss,B,1
+Q005,Finance,"A supplementary appropriation is passed when?",Revenue falls,The original budget is insufficient,A new year begins,Audit completes,B,1
+Q006,Finance,"The document authorising government spending is the?",Warrant,Receipt,Voucher,Mandate,A,1
+Q007,ICT,"In a database, a primary key must be?",Nullable,Unique,Duplicated,Encrypted,B,1
+Q008,ICT,"HTTP status code 404 means?",OK,Server error,Not found,Redirect,C,1
+Q009,Ethics,"The code of conduct for public officers is enforced by the?",Police,Code of Conduct Bureau,EFCC,Judiciary,B,1
