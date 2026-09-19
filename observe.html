@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ASCON CBT — Observer</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div class="topnav">
+  <span class="brand">ASCON&nbsp;CBT</span>
+  <span style="color:#dce4f2;font-weight:700">Observer view</span>
+  <span class="right"><span class="badge">READ-ONLY</span><span id="olabel" style="color:#cdd7ea"></span></span>
+</div>
+<div class="container">
+  <div id="obad" class="hidden"><div class="card"><h1>Link not valid</h1><p class="hint">This observer link is invalid or has been revoked.</p></div></div>
+  <div id="obody" class="hidden">
+    <h1 id="otitle">Live Observation</h1>
+    <p class="hint">Auto-refresh · <span id="ots"></span></p>
+    <div class="stat-grid" id="o-stats"></div>
+    <div class="card" style="margin-top:16px">
+      <div class="flex" style="justify-content:space-between"><h2 style="margin:0">Candidates</h2>
+        <button class="btn small gold" id="o-dl">⬇ Download all results (CSV)</button></div>
+      <div style="overflow-x:auto;margin-top:12px"><table id="o-tbl"><thead><tr>
+        <th>Name</th><th>ID</th><th>Status</th><th>Progress</th><th>Online</th><th>Focus loss</th><th>Location</th><th>Logged in</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script>
+(function(){
+  var A=window.ASCON, esc=A.esc;
+  var token=new URLSearchParams(location.search).get('t')||'';
+  if(!A.configured()){ document.getElementById('obody').classList.add('hidden'); document.querySelector('.container').innerHTML='<div class="card"><h1>Not configured</h1></div>'; return; }
+  if(!token){ document.getElementById('obad').classList.remove('hidden'); return; }
+
+  function statCard(n,l){ return '<div class="stat"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+  function stepPill(s){ var map={password:['Not started','off'],instructions:['Reading','on'],confirm:['Confirming','on'],exam_info:['Start screen','on'],exam:['Writing','mid'],submitted:['Submitted','sub']};
+    var v=map[s]||[s,'off']; return '<span class="pill '+v[1]+'">'+esc(v[0])+'</span>'; }
+  function fmtTime(t){ if(!t) return '—'; try{return new Date(t).toLocaleString();}catch(e){return '—';} }
+
+  function load(){
+    A.api('observeData',{token:token}).then(function(r){
+      document.getElementById('obody').classList.remove('hidden');
+      var s=r.stats;
+      document.getElementById('o-stats').innerHTML=
+        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted');
+      var body=r.rows.map(function(c){
+        var loc=(c.geo_lat&&c.geo_lng)?'<a target="_blank" href="https://maps.google.com/?q='+c.geo_lat+','+c.geo_lng+'">map</a>':(c.geo_status||'—');
+        return '<tr><td><b>'+esc(c.full_name)+'</b></td><td>'+esc(c.exam_taker_id)+'</td><td>'+stepPill(c.step)+'</td>'+
+          '<td>'+c.answered+' / '+c.total_q+'</td>'+
+          '<td>'+(c.online?'<span class="pill on">yes</span>':'<span class="pill off">no</span>')+'</td>'+
+          '<td>'+(c.focus_loss>0?'<span class="pill mid">'+c.focus_loss+'</span>':'0')+'</td>'+
+          '<td>'+loc+'</td><td>'+fmtTime(c.logged_in_at)+'</td></tr>';
+      }).join('');
+      document.querySelector('#o-tbl tbody').innerHTML=body||'<tr><td colspan="8" class="hint">No candidates yet.</td></tr>';
+      document.getElementById('ots').textContent=new Date().toLocaleTimeString();
+    }).catch(function(e){ document.getElementById('obad').classList.remove('hidden'); document.getElementById('obody').classList.add('hidden'); });
+  }
+
+  document.getElementById('o-dl').onclick=function(){
+    var head=['Exam Taker ID','Full Name','Present Post','Promotion Post','Grade Level','Location','Status','Answered','Total','Score','Max Score','Focus Loss','GPS','Logged In','Started','Submitted'];
+    A.api('results',{token:token}).then(function(r){
+      var rows=r.rows.map(function(x){return [x.exam_taker_id,x.full_name,x.present_post,x.promotion_post,x.promotion_grade_level,x.exam_location,x.step,x.answered,x.total_q,x.score,x.max_score,x.focus_loss,x.geo,x.logged_in_at,x.started_at,x.submitted_at];});
+      A.download('ascon-results.csv', A.toCSV(head,rows));
+    }).catch(function(e){ alert(e.message); });
+  };
+
+  load(); setInterval(load, 10000);
+})();
+</script>
+</body>
+</html>

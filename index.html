@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ASCON Promotion Examination</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+
+<!-- 1. USERNAME -->
+<section id="s-username" class="stage">
+  <div class="panel">
+    <div class="brandbar"><span class="logo">A</span><b>ASCON&nbsp;Promotion&nbsp;Examination</b></div>
+    <h1>Welcome</h1>
+    <p class="note">Enter your username to begin.</p>
+    <label class="big-label" for="u">Username</label>
+    <input id="u" type="text" autocomplete="off" autofocus>
+    <div id="e-username" class="error hidden"></div>
+    <button id="b-username" class="btn">Continue</button>
+  </div>
+</section>
+
+<!-- 2. PASSWORD -->
+<section id="s-password" class="stage hidden">
+  <div class="panel">
+    <div class="brandbar"><span class="logo">A</span><b>ASCON&nbsp;Promotion&nbsp;Examination</b></div>
+    <h1>Enter your password</h1>
+    <p class="note" id="pw-hello"></p>
+    <label class="big-label" for="p">Password</label>
+    <input id="p" type="password" autocomplete="off">
+    <div id="e-password" class="error hidden"></div>
+    <button id="b-password" class="btn">Sign in</button>
+    <button id="b-back" class="link" type="button">← Change username</button>
+  </div>
+</section>
+
+<!-- 3. INSTRUCTIONS + LOCATION + TERMS -->
+<section id="s-instructions" class="stage hidden">
+  <div class="panel">
+    <h1 id="ins-title">Examination Instructions</h1>
+    <div id="ins-html" class="content-html"></div>
+    <div id="geo" class="geo-status wait">📍 Switch on your location to continue…</div>
+    <div class="checkrow">
+      <input id="agree" type="checkbox">
+      <label for="agree">I have read the instructions and I accept the terms below.</label>
+    </div>
+    <div id="terms-html" class="content-html" style="margin-top:14px;font-size:17px;color:var(--muted)"></div>
+    <div id="e-instructions" class="error hidden"></div>
+    <button id="b-instructions" class="btn" disabled>I understand — continue</button>
+  </div>
+</section>
+
+<!-- 4. CONFIRM DETAILS -->
+<section id="s-confirm" class="stage hidden">
+  <div class="panel">
+    <h1>Confirm your details</h1>
+    <p class="note">Please confirm the information below is correct before you proceed.</p>
+    <div class="detail"><div class="k">Name</div><div class="v" id="c-name"></div></div>
+    <div class="detail"><div class="k">Present post / designation</div><div class="v" id="c-present"></div></div>
+    <div class="detail"><div class="k">Promotion cadre / post</div><div class="v" id="c-prom"></div></div>
+    <div class="detail"><div class="k">Promotion grade level</div><div class="v" id="c-grade"></div></div>
+    <button id="b-confirm" class="btn">These details are correct — proceed</button>
+  </div>
+</section>
+
+<!-- 5. EXAM INFO + COUNTDOWN -->
+<section id="s-info" class="stage hidden">
+  <div class="panel">
+    <h1>Your paper</h1>
+    <label class="big-label">Areas you will be examined on</label>
+    <div class="areas" id="i-areas"></div>
+    <div class="detail"><div class="k">Number of questions</div><div class="v" id="i-count"></div></div>
+    <div class="detail"><div class="k">Duration</div><div class="v" id="i-duration"></div></div>
+    <div id="i-countwrap" class="hidden">
+      <label class="big-label" style="text-align:center">Examination begins in</label>
+      <div class="countdown" id="i-countdown">--:--</div>
+    </div>
+    <button id="b-start" class="btn gold" disabled>Start Examination</button>
+  </div>
+</section>
+
+<!-- 6. EXAM -->
+<section id="s-exam" class="hidden">
+  <div class="topbar">
+    <div class="who"><b id="x-name"></b><span id="x-id"></span></div>
+    <div id="x-timer" class="timer">--:--</div>
+    <button id="x-submit" class="submit-btn">Submit Paper</button>
+  </div>
+  <div class="examwrap">
+    <div id="x-warn" class="warnbanner hidden"></div>
+    <div class="qcard">
+      <div class="qarea" id="x-area"></div>
+      <div class="qnum" id="x-num"></div>
+      <div class="qtext" id="x-text"></div>
+      <div id="x-opts"></div>
+      <div class="navrow">
+        <button id="x-prev" class="btn">← Previous</button>
+        <button id="x-next" class="btn">Next →</button>
+      </div>
+    </div>
+    <div class="palette" id="x-palette"></div>
+  </div>
+</section>
+
+<!-- 7. DONE -->
+<section id="s-done" class="stage hidden">
+  <div class="panel" style="text-align:center">
+    <div style="font-size:64px">✅</div>
+    <h1>Paper submitted</h1>
+    <p class="note">Your responses have been recorded. You may now close this window.</p>
+  </div>
+</section>
+
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script>
+(function(){
+  var A = window.ASCON, esc = A.esc;
+  var S = {};                 // session state
+  var LS_KEY = 'ascon_session';
+
+  function show(id){ ['username','password','instructions','confirm','info','exam','done']
+      .forEach(function(k){ document.getElementById('s-'+k).classList.toggle('hidden', k!==id); }); window.scrollTo(0,0); }
+  function err(id,msg){ var el=document.getElementById('e-'+id); el.textContent=msg; el.classList.remove('hidden'); }
+  function clearErr(id){ document.getElementById('e-'+id).classList.add('hidden'); }
+
+  if (!A.configured()) { document.getElementById('s-username').innerHTML =
+    '<div class="panel"><h1>Not configured</h1><p class="note">The exam link has not been set up yet (missing API URL in config.js). Please contact the administrator.</p></div>'; return; }
+
+  /* ---------- 1. username ---------- */
+  document.getElementById('b-username').onclick = function(){
+    var u = document.getElementById('u').value.trim();
+    if(!u){ err('username','Please enter your username.'); return; }
+    clearErr('username'); this.disabled=true; this.textContent='Checking…';
+    A.api('candidateLogin',{username:u}).then(function(r){
+      S.username=u; document.getElementById('pw-hello').textContent = r.full_name ? ('Signing in as '+r.full_name) : '';
+      show('password'); document.getElementById('p').focus();
+    }).catch(function(e){ err('username', e.message); })
+      .finally(function(){ var b=document.getElementById('b-username'); b.disabled=false; b.textContent='Continue'; });
+  };
+  document.getElementById('u').addEventListener('keydown',function(e){ if(e.key==='Enter') document.getElementById('b-username').click(); });
+  document.getElementById('b-back').onclick=function(){ show('username'); };
+
+  /* ---------- 2. password ---------- */
+  document.getElementById('b-password').onclick=function(){
+    var p=document.getElementById('p').value;
+    if(!p){ err('password','Please enter your password.'); return; }
+    clearErr('password'); this.disabled=true; this.textContent='Signing in…';
+    A.api('candidateLogin',{username:S.username,password:p}).then(function(r){
+      S = Object.assign(S, r);
+      S.answers = r.saved_answers || {};
+      persist();
+      enterFromStep(r.step || 'instructions');
+    }).catch(function(e){ err('password', e.message); })
+      .finally(function(){ var b=document.getElementById('b-password'); b.disabled=false; b.textContent='Sign in'; });
+  };
+  document.getElementById('p').addEventListener('keydown',function(e){ if(e.key==='Enter') document.getElementById('b-password').click(); });
+
+  function enterFromStep(step){
+    if(step==='submitted'){ show('done'); return; }
+    if(step==='exam'){ prepExam(); startExam(true); return; }
+    // default: begin from instructions
+    fillInstructions(); show('instructions');
+  }
+
+  /* ---------- 3. instructions + location + terms ---------- */
+  function fillInstructions(){
+    document.getElementById('ins-title').textContent = S.exam_title || 'Examination Instructions';
+    document.getElementById('ins-html').innerHTML = S.instructions_html || '';
+    document.getElementById('terms-html').innerHTML = S.terms_html || '';
+    if (S.require_location === false){ setGeoOK({}); }
+    else requestGeo();
+    refreshContinue();
+  }
+  function setGeoOK(pos){ S.geo = pos.coords ? {lat:pos.coords.latitude,lng:pos.coords.longitude,status:'granted'} : {status:'not_required'};
+    var g=document.getElementById('geo'); g.className='geo-status ok'; g.textContent='📍 Location on — thank you.'; refreshContinue(); }
+  function requestGeo(){
+    var g=document.getElementById('geo');
+    if(!navigator.geolocation){ g.className='geo-status bad'; g.textContent='This device cannot provide location. Please use a device with location.'; return; }
+    g.className='geo-status wait'; g.textContent='📍 Requesting your location… please tap “Allow”.';
+    navigator.geolocation.getCurrentPosition(setGeoOK, function(){
+      g.className='geo-status bad'; g.textContent='Location is required. Please switch it on and tap here to retry.'; g.onclick=requestGeo;
+    }, {enableHighAccuracy:true, timeout:15000});
+  }
+  document.getElementById('agree').addEventListener('change', refreshContinue);
+  function geoReady(){ return S.require_location===false || (S.geo && (S.geo.status==='granted'||S.geo.status==='not_required')); }
+  function refreshContinue(){ document.getElementById('b-instructions').disabled = !(document.getElementById('agree').checked && geoReady()); }
+  document.getElementById('b-instructions').onclick=function(){
+    if(!(document.getElementById('agree').checked && geoReady())){ err('instructions','Please switch on location and accept the terms.'); return; }
+    sync({step:'confirm'}); fillConfirm(); show('confirm');
+  };
+
+  /* ---------- 4. confirm ---------- */
+  function fillConfirm(){
+    var p=S.profile||{};
+    document.getElementById('c-name').textContent = p.full_name||'—';
+    document.getElementById('c-present').textContent = p.present_post||'—';
+    document.getElementById('c-prom').textContent = p.promotion_post||'—';
+    document.getElementById('c-grade').textContent = p.promotion_grade_level||'—';
+  }
+  document.getElementById('b-confirm').onclick=function(){ sync({step:'exam_info'}); fillInfo(); show('info'); };
+
+  /* ---------- 5. exam info + countdown ---------- */
+  function fillInfo(){
+    var box=document.getElementById('i-areas'); box.innerHTML='';
+    (S.areas||[]).forEach(function(a){ var t=document.createElement('span'); t.className='tag'; t.textContent=a; box.appendChild(t); });
+    document.getElementById('i-count').textContent = (S.questions||[]).length + ' questions';
+    document.getElementById('i-duration').textContent = (S.duration_minutes||60) + ' minutes';
+    var startBtn=document.getElementById('b-start');
+    var sched = S.scheduled_start ? new Date(S.scheduled_start).getTime() : 0;
+    if(sched && sched > Date.now()){
+      document.getElementById('i-countwrap').classList.remove('hidden');
+      var tick=setInterval(function(){
+        var left=Math.floor((sched-Date.now())/1000);
+        if(left<=0){ clearInterval(tick); document.getElementById('i-countdown').textContent='00:00'; startBtn.disabled=false; }
+        else document.getElementById('i-countdown').textContent = fmt(left);
+      },1000);
+      startBtn.disabled=true;
+    } else { startBtn.disabled=false; }
+  }
+  document.getElementById('b-start').onclick=function(){
+    this.disabled=true; this.textContent='Starting…';
+    A.api('candidateStart',{token:S.token}).then(function(r){
+      S.started_at=r.started_at; S.remaining=r.remaining; persist();
+      prepExam(); startExam(false);
+    }).catch(function(e){ alert(e.message); document.getElementById('b-start').disabled=false; document.getElementById('b-start').textContent='Start Examination'; });
+  };
+
+  /* ---------- 6. exam ---------- */
+  var idx=0, focusLoss=0, syncTimer=null, tickTimer=null, remaining=0, submitting=false;
+
+  function prepExam(){
+    var p=S.profile||{};
+    document.getElementById('x-name').textContent=p.full_name||'';
+    document.getElementById('x-id').textContent=p.exam_taker_id||'';
+    S.answers = S.answers || {};
+  }
+  function startExam(resume){
+    show('exam');
+    // server-authoritative remaining: recompute from started_at + duration
+    var dur=(S.duration_minutes||60)*60;
+    remaining = S.started_at ? Math.max(0, Math.floor((new Date(S.started_at).getTime()+dur*1000-Date.now())/1000)) : (S.remaining||dur);
+    renderQ(); renderPalette();
+    tickTimer=setInterval(tick,1000); tick();
+    scheduleSync();
+    trackFocus();
+    window.addEventListener('beforeunload', function(e){ if(!submitting){ e.preventDefault(); e.returnValue=''; } });
+  }
+  function renderQ(){
+    var q=S.questions[idx];
+    document.getElementById('x-area').textContent=q.area||'';
+    document.getElementById('x-num').textContent='Question '+(idx+1)+' of '+S.questions.length;
+    document.getElementById('x-text').textContent=q.text||'';
+    var box=document.getElementById('x-opts'); box.innerHTML='';
+    ['A','B','C','D'].forEach(function(k){
+      if(!q.opts[k]) return;
+      var d=document.createElement('div'); d.className='opt'+(S.answers[q.id]===k?' sel':'');
+      d.innerHTML='<span class="k">'+k+'</span><span>'+esc(q.opts[k])+'</span>';
+      d.onclick=function(){ S.answers[q.id]=k; persist(); renderQ(); renderPalette(); };
+      box.appendChild(d);
+    });
+    document.getElementById('x-prev').style.visibility = idx===0?'hidden':'visible';
+    document.getElementById('x-next').style.visibility = idx===S.questions.length-1?'hidden':'visible';
+  }
+  function renderPalette(){
+    var pal=document.getElementById('x-palette'); pal.innerHTML='';
+    S.questions.forEach(function(q,i){
+      var b=document.createElement('button'); b.className='p'+(S.answers[q.id]?' done':'')+(i===idx?' cur':''); b.textContent=i+1;
+      b.onclick=function(){ idx=i; renderQ(); renderPalette(); }; pal.appendChild(b);
+    });
+  }
+  document.getElementById('x-prev').onclick=function(){ if(idx>0){idx--;renderQ();renderPalette();} };
+  document.getElementById('x-next').onclick=function(){ if(idx<S.questions.length-1){idx++;renderQ();renderPalette();} };
+
+  function tick(){
+    remaining--;
+    var t=document.getElementById('x-timer');
+    t.textContent=fmt(Math.max(0,remaining));
+    t.classList.toggle('warn', remaining<=300);
+    if(remaining<=0){ clearInterval(tickTimer); doSubmit(true); }
+  }
+  function trackFocus(){
+    var warn=document.getElementById('x-warn');
+    function lost(){ focusLoss++; warn.classList.remove('hidden'); warn.textContent='⚠ Please stay on this window. Leaving the exam is recorded ('+focusLoss+').'; sync({}); }
+    document.addEventListener('visibilitychange', function(){ if(document.hidden) lost(); });
+    window.addEventListener('blur', lost);
+  }
+
+  function scheduleSync(){
+    var base=(A.CFG.SYNC_SECONDS||60)*1000;
+    var jitter=Math.floor(Math.random()*8000);   // spread writes so 300 clients don't all hit the same second
+    syncTimer=setTimeout(function(){ sync({}); scheduleSync(); }, base+jitter);
+  }
+  function sync(extra){
+    var payload=Object.assign({token:S.token, answers:S.answers, focus_loss:focusLoss, step:'exam'}, extra);
+    if(S.geo) payload.geo=S.geo;
+    return A.api('candidateSync',payload).then(function(r){
+      if(r && typeof r.remaining==='number' && Math.abs(r.remaining-remaining)>5) remaining=r.remaining; // re-anchor to server
+      if(r && r.remaining===0) doSubmit(true);
+    }).catch(function(){ /* offline tolerated; localStorage holds answers */ });
+  }
+
+  document.getElementById('x-submit').onclick=function(){ if(confirm('Submit your paper now? You cannot change answers after this.')) doSubmit(false); };
+  function doSubmit(auto){
+    if(submitting) return; submitting=true;
+    clearInterval(tickTimer); clearTimeout(syncTimer);
+    A.api('candidateSubmit',{token:S.token, answers:S.answers, focus_loss:focusLoss}).then(function(){
+      localStorage.removeItem(LS_KEY); show('done');
+    }).catch(function(e){ submitting=false; alert('Submit failed: '+e.message+'. Please check your connection and try again.'); });
+  }
+
+  /* ---------- helpers ---------- */
+  function fmt(s){ var m=Math.floor(s/60), ss=s%60; return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
+  function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({username:S.username, token:S.token, answers:S.answers, started_at:S.started_at})); }catch(e){} }
+})();
+</script>
+</body>
+</html>

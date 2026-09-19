@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ASCON CBT — Administration</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="auth">
+  <div class="authcard">
+    <h1 style="color:var(--navy)">ASCON CBT</h1>
+    <p class="hint">Administration sign in</p>
+    <div id="login-err" class="error hidden"></div>
+    <label class="fld">Username</label><input id="lu" class="panel-input" autocomplete="off">
+    <label class="fld">Password</label><input id="lp" class="panel-input" type="password">
+    <button id="lb" class="btn" style="margin-top:20px">Sign in</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <div class="topnav">
+    <span class="brand">ASCON&nbsp;CBT</span>
+    <button class="tab active" data-tab="dashboard">Dashboard</button>
+    <button class="tab" data-tab="monitor">Live Monitor</button>
+    <button class="tab" data-tab="upload">Uploads</button>
+    <button class="tab" data-tab="results">Results</button>
+    <button class="tab" data-tab="settings">Settings</button>
+    <button class="tab super hidden" data-tab="admins">Admins</button>
+    <button class="tab super hidden" data-tab="observers">Observer Links</button>
+    <span class="right">
+      <span class="badge" id="role-badge"></span>
+      <span id="who" style="color:#cdd7ea"></span>
+      <a href="#" id="logout">Logout</a>
+    </span>
+  </div>
+  <div class="container">
+
+    <div id="t-dashboard" class="tabpage">
+      <h1>Dashboard</h1>
+      <div class="card"><h2 id="d-title">Examination</h2><p class="hint" id="d-meta"></p></div>
+      <div class="stat-grid" id="d-stats"></div>
+    </div>
+
+    <div id="t-monitor" class="tabpage hidden">
+      <h1>Live Monitor</h1>
+      <div class="stat-grid" id="m-stats"></div>
+      <div class="card" style="margin-top:16px">
+        <div class="flex" style="justify-content:space-between"><h2 style="margin:0">Candidates</h2>
+          <span class="hint">Auto-refresh · <span id="m-ts"></span></span></div>
+        <div style="overflow-x:auto;margin-top:12px"><table id="m-tbl"><thead><tr>
+          <th>Name</th><th>ID</th><th>Status</th><th>Progress</th><th>Online</th><th>Focus loss</th><th>Location</th><th>Logged in</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <div id="t-upload" class="tabpage hidden">
+      <h1>CSV Uploads</h1>
+      <div id="u-msg"></div>
+      <div class="card">
+        <h2>1 · Candidates</h2>
+        <p class="hint">Columns: <code>exam_taker_id, username, password, full_name, present_post, promotion_post, promotion_grade_level, exam_location</code></p>
+        <input type="file" id="f-cand" accept=".csv" class="panel-input">
+        <button class="btn small" style="margin-top:10px" data-up="candidates" data-file="f-cand">Upload candidates</button>
+        <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/candidates.csv" download>Sample</a>
+      </div>
+      <div class="card">
+        <h2>2 · Question assignment</h2>
+        <p class="hint">Either <code>exam_taker_id, question_id</code> (one per row) or <code>exam_taker_id, question_ids</code> (space/comma separated).</p>
+        <input type="file" id="f-assign" accept=".csv" class="panel-input">
+        <button class="btn small" style="margin-top:10px" data-up="assign" data-file="f-assign">Upload assignment</button>
+        <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/assignment.csv" download>Sample</a>
+      </div>
+      <div class="card">
+        <h2>3 · Questions bank</h2>
+        <p class="hint">Columns: <code>question_id, area, question_text, option_a, option_b, option_c, option_d, correct_answer, marks</code></p>
+        <input type="file" id="f-q" accept=".csv" class="panel-input">
+        <button class="btn small" style="margin-top:10px" data-up="questions" data-file="f-q">Upload questions</button>
+        <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/questions.csv" download>Sample</a>
+      </div>
+    </div>
+
+    <div id="t-results" class="tabpage hidden">
+      <h1>Results</h1>
+      <div class="card"><div class="flex">
+        <button class="btn small gold" id="dl-results">⬇ Download all results (CSV)</button>
+        <button class="btn small" id="dl-activity">⬇ Download activity log (CSV)</button>
+      </div></div>
+      <div class="card"><div style="overflow-x:auto"><table id="r-tbl"><thead><tr>
+        <th>Name</th><th>ID</th><th>Promotion</th><th>Grade</th><th>Answered</th><th>Score</th><th>Status</th><th>Submitted</th>
+      </tr></thead><tbody></tbody></table></div></div>
+    </div>
+
+    <div id="t-settings" class="tabpage hidden">
+      <h1>Settings</h1>
+      <div id="s-msg"></div>
+      <div class="card">
+        <label class="fld">Examination title</label><input id="set-title" class="panel-input">
+        <label class="fld">Duration (minutes)</label><input id="set-duration" class="panel-input" type="number" min="1">
+        <label class="fld">Scheduled start (leave blank to open immediately)</label><input id="set-start" class="panel-input" type="datetime-local">
+        <label class="fld"><input id="set-loc" type="checkbox"> Require location capture</label>
+        <label class="fld"><input id="set-shuffle" type="checkbox"> Shuffle questions per candidate</label>
+        <label class="fld">Instructions (HTML)</label><textarea id="set-ins" class="panel-input" style="min-height:120px"></textarea>
+        <label class="fld">Terms (HTML)</label><textarea id="set-terms" class="panel-input" style="min-height:100px"></textarea>
+        <button class="btn small" id="save-settings" style="margin-top:16px">Save settings</button>
+      </div>
+    </div>
+
+    <div id="t-admins" class="tabpage hidden">
+      <h1>Admins</h1>
+      <div id="a-msg"></div>
+      <div class="card">
+        <h2>Create admin</h2>
+        <p class="hint">Admins can upload, monitor and download results. They cannot see the superadmin, create admins, or manage observer links.</p>
+        <div class="flex" style="align-items:flex-end">
+          <div style="flex:1;min-width:160px"><label class="fld">Username</label><input id="a-user" class="panel-input"></div>
+          <div style="flex:1;min-width:160px"><label class="fld">Full name</label><input id="a-name" class="panel-input"></div>
+          <div style="flex:1;min-width:160px"><label class="fld">Password</label><input id="a-pass" class="panel-input" type="password"></div>
+          <button class="btn small" id="a-create">Create</button>
+        </div>
+      </div>
+      <div class="card"><div style="overflow-x:auto"><table id="a-tbl"><thead><tr>
+        <th>Username</th><th>Name</th><th>Status</th><th>Last login</th><th>Action</th>
+      </tr></thead><tbody></tbody></table></div></div>
+    </div>
+
+    <div id="t-observers" class="tabpage hidden">
+      <h1>Observer Links</h1>
+      <div id="o-msg"></div>
+      <div class="card">
+        <h2>Create passwordless observer link</h2>
+        <p class="hint">Anyone with the link can watch live activity and download results — no login. Revoke anytime.</p>
+        <div class="flex" style="align-items:flex-end">
+          <div style="flex:1"><label class="fld">Label</label><input id="o-label" class="panel-input" placeholder="e.g. ASCON Exam Observer"></div>
+          <button class="btn small gold" id="o-create">Generate link</button>
+        </div>
+      </div>
+      <div id="o-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script>
+(function(){
+  var A=window.ASCON, esc=A.esc, T={token:null, role:null};
+  var monTimer=null;
+
+  if(!A.configured()){ document.querySelector('#login .authcard').innerHTML='<h1>Not configured</h1><p class="hint">Set your Apps Script URL in config.js first.</p>'; return; }
+
+  /* ---- login ---- */
+  document.getElementById('lb').onclick=function(){
+    var u=document.getElementById('lu').value.trim(), p=document.getElementById('lp').value;
+    var e=document.getElementById('login-err'); e.classList.add('hidden');
+    this.disabled=true; this.textContent='Signing in…';
+    A.api('adminLogin',{username:u,password:p}).then(function(r){
+      T.token=r.token; T.role=r.role;
+      document.getElementById('role-badge').textContent=r.role.toUpperCase();
+      document.getElementById('who').textContent=r.full_name||u;
+      if(r.role==='superadmin') document.querySelectorAll('.super').forEach(function(x){x.classList.remove('hidden');});
+      document.getElementById('login').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      loadDashboard();
+    }).catch(function(err){ e.textContent=err.message; e.classList.remove('hidden'); })
+      .finally(function(){ var b=document.getElementById('lb'); b.disabled=false; b.textContent='Sign in'; });
+  };
+  document.getElementById('lp').addEventListener('keydown',function(e){ if(e.key==='Enter') document.getElementById('lb').click(); });
+  document.getElementById('logout').onclick=function(e){ e.preventDefault(); location.reload(); };
+
+  /* ---- tabs ---- */
+  document.querySelectorAll('.tab').forEach(function(btn){
+    btn.onclick=function(){
+      document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('active');}); btn.classList.add('active');
+      var tab=btn.dataset.tab;
+      document.querySelectorAll('.tabpage').forEach(function(p){p.classList.add('hidden');});
+      document.getElementById('t-'+tab).classList.remove('hidden');
+      if(monTimer){ clearInterval(monTimer); monTimer=null; }
+      if(tab==='dashboard') loadDashboard();
+      if(tab==='monitor'){ loadMonitor(); monTimer=setInterval(loadMonitor, (A.CFG.SYNC_SECONDS?10000:10000)); }
+      if(tab==='results') loadResults();
+      if(tab==='settings') loadSettings();
+      if(tab==='admins') loadAdmins();
+      if(tab==='observers') loadObservers();
+    };
+  });
+
+  function statCard(n,l){ return '<div class="stat"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+  function stepPill(s){ var map={password:['Not started','off'],instructions:['Reading instructions','on'],confirm:['Confirming','on'],exam_info:['On start screen','on'],exam:['Writing paper','mid'],submitted:['Submitted','sub']};
+    var v=map[s]||[s,'off']; return '<span class="pill '+v[1]+'">'+esc(v[0])+'</span>'; }
+  function fmtTime(t){ if(!t) return '—'; try{return new Date(t).toLocaleString();}catch(e){return '—';} }
+
+  /* ---- dashboard ---- */
+  function loadDashboard(){
+    A.api('getSettings',{token:T.token}).then(function(r){
+      var s=r.settings||{};
+      document.getElementById('d-title').textContent=s.exam_title||'Examination';
+      document.getElementById('d-meta').innerHTML='Duration <b>'+(s.duration_minutes||60)+' min</b> · Scheduled: <b>'+(s.scheduled_start?esc(s.scheduled_start):'Open (immediate)')+'</b> · Location required: <b>'+(s.require_location!=='0'?'Yes':'No')+'</b>';
+    });
+    A.api('monitor',{token:T.token}).then(function(r){
+      var s=r.stats; document.getElementById('d-stats').innerHTML=
+        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted');
+    });
+  }
+
+  /* ---- monitor ---- */
+  function loadMonitor(){
+    A.api('monitor',{token:T.token}).then(function(r){
+      var s=r.stats;
+      document.getElementById('m-stats').innerHTML=
+        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted');
+      var body=r.rows.map(function(c){
+        var loc=(c.geo_lat&&c.geo_lng)?'<a target="_blank" href="https://maps.google.com/?q='+c.geo_lat+','+c.geo_lng+'">map</a>':(c.geo_status||'—');
+        return '<tr><td><b>'+esc(c.full_name)+'</b></td><td>'+esc(c.exam_taker_id)+'</td><td>'+stepPill(c.step)+'</td>'+
+          '<td>'+c.answered+' / '+c.total_q+'</td>'+
+          '<td>'+(c.online?'<span class="pill on">yes</span>':'<span class="pill off">no</span>')+'</td>'+
+          '<td>'+(c.focus_loss>0?'<span class="pill mid">'+c.focus_loss+'</span>':'0')+'</td>'+
+          '<td>'+loc+'</td><td>'+fmtTime(c.logged_in_at)+'</td></tr>';
+      }).join('');
+      document.querySelector('#m-tbl tbody').innerHTML=body||'<tr><td colspan="8" class="hint">No candidates yet.</td></tr>';
+      document.getElementById('m-ts').textContent=new Date().toLocaleTimeString();
+    }).catch(function(){});
+  }
+
+  /* ---- uploads ---- */
+  document.querySelectorAll('[data-up]').forEach(function(btn){
+    btn.onclick=function(){
+      var kind=btn.dataset.up, fileEl=document.getElementById(btn.dataset.file);
+      if(!fileEl.files[0]){ msg('u-msg','Please choose a file first.',true); return; }
+      var reader=new FileReader();
+      reader.onload=function(){
+        var rows=A.parseCSV(reader.result);
+        var action=kind==='candidates'?'uploadCandidates':(kind==='assign'?'uploadAssign':'uploadQuestions');
+        btn.disabled=true; btn.textContent='Uploading…';
+        A.api(action,{token:T.token, rows:rows}).then(function(r){
+          msg('u-msg','Processed '+r.processed+' row(s).',false);
+        }).catch(function(e){ msg('u-msg',e.message,true); })
+          .finally(function(){ btn.disabled=false; btn.textContent='Upload '+kind; });
+      };
+      reader.readAsText(fileEl.files[0]);
+    };
+  });
+
+  /* ---- results ---- */
+  var lastResults=[];
+  function loadResults(){
+    A.api('results',{token:T.token}).then(function(r){
+      lastResults=r.rows;
+      var body=r.rows.map(function(x){
+        return '<tr><td><b>'+esc(x.full_name)+'</b></td><td>'+esc(x.exam_taker_id)+'</td>'+
+          '<td>'+esc(x.promotion_post||'—')+'</td><td>'+esc(x.promotion_grade_level||'—')+'</td>'+
+          '<td>'+x.answered+' / '+x.total_q+'</td><td><b>'+x.score+'</b> / '+x.max_score+'</td>'+
+          '<td>'+stepPill(x.step)+'</td><td>'+fmtTime(x.submitted_at)+'</td></tr>';
+      }).join('');
+      document.querySelector('#r-tbl tbody').innerHTML=body||'<tr><td colspan="8" class="hint">No candidates yet.</td></tr>';
+    });
+  }
+  document.getElementById('dl-results').onclick=function(){
+    var head=['Exam Taker ID','Full Name','Present Post','Promotion Post','Grade Level','Location','Status','Answered','Total','Score','Max Score','Focus Loss','GPS','Logged In','Started','Submitted'];
+    A.api('results',{token:T.token}).then(function(r){
+      var rows=r.rows.map(function(x){return [x.exam_taker_id,x.full_name,x.present_post,x.promotion_post,x.promotion_grade_level,x.exam_location,x.step,x.answered,x.total_q,x.score,x.max_score,x.focus_loss,x.geo,x.logged_in_at,x.started_at,x.submitted_at];});
+      A.download('ascon-results-'+stamp()+'.csv', A.toCSV(head,rows));
+    });
+  };
+  document.getElementById('dl-activity').onclick=function(){
+    A.api('activity',{token:T.token}).then(function(r){
+      var rows=r.rows.map(function(x){return [x.at,x.event,x.exam_taker_id,x.detail];});
+      A.download('ascon-activity-'+stamp()+'.csv', A.toCSV(['Time','Event','Exam Taker ID','Detail'],rows));
+    });
+  };
+
+  /* ---- settings ---- */
+  function loadSettings(){
+    A.api('getSettings',{token:T.token}).then(function(r){
+      var s=r.settings||{};
+      document.getElementById('set-title').value=s.exam_title||'';
+      document.getElementById('set-duration').value=s.duration_minutes||60;
+      document.getElementById('set-start').value=s.scheduled_start?toLocalInput(s.scheduled_start):'';
+      document.getElementById('set-loc').checked=s.require_location!=='0';
+      document.getElementById('set-shuffle').checked=s.shuffle_questions!=='0';
+      document.getElementById('set-ins').value=s.instructions_html||'';
+      document.getElementById('set-terms').value=s.terms_html||'';
+    });
+  }
+  document.getElementById('save-settings').onclick=function(){
+    var startVal=document.getElementById('set-start').value;
+    var settings={
+      exam_title:document.getElementById('set-title').value,
+      duration_minutes:String(parseInt(document.getElementById('set-duration').value||'60',10)),
+      scheduled_start:startVal?new Date(startVal).toISOString():'',
+      require_location:document.getElementById('set-loc').checked?'1':'0',
+      shuffle_questions:document.getElementById('set-shuffle').checked?'1':'0',
+      instructions_html:document.getElementById('set-ins').value,
+      terms_html:document.getElementById('set-terms').value
+    };
+    A.api('saveSettings',{token:T.token, settings:settings}).then(function(){ msg('s-msg','Settings saved.',false); }).catch(function(e){ msg('s-msg',e.message,true); });
+  };
+
+  /* ---- admins (super) ---- */
+  function loadAdmins(){
+    A.api('listAdmins',{token:T.token}).then(function(r){
+      var body=r.rows.map(function(a){
+        return '<tr><td><b>'+esc(a.username)+'</b></td><td>'+esc(a.full_name||'—')+'</td>'+
+          '<td>'+(a.active?'<span class="pill on">active</span>':'<span class="pill off">disabled</span>')+'</td>'+
+          '<td>'+fmtTime(a.last_login)+'</td>'+
+          '<td><button class="btn small" data-toggle-admin="'+esc(a.username)+'">'+(a.active?'Disable':'Enable')+'</button></td></tr>';
+      }).join('');
+      document.querySelector('#a-tbl tbody').innerHTML=body||'<tr><td colspan="5" class="hint">No admins yet.</td></tr>';
+      document.querySelectorAll('[data-toggle-admin]').forEach(function(b){
+        b.onclick=function(){ A.api('toggleAdmin',{token:T.token,username:b.dataset.toggleAdmin}).then(loadAdmins); };
+      });
+    });
+  }
+  document.getElementById('a-create').onclick=function(){
+    A.api('createAdmin',{token:T.token,username:document.getElementById('a-user').value.trim(),full_name:document.getElementById('a-name').value.trim(),password:document.getElementById('a-pass').value})
+      .then(function(){ msg('a-msg','Admin created.',false); document.getElementById('a-user').value='';document.getElementById('a-name').value='';document.getElementById('a-pass').value=''; loadAdmins(); })
+      .catch(function(e){ msg('a-msg',e.message,true); });
+  };
+
+  /* ---- observers (super) ---- */
+  function loadObservers(){
+    A.api('listObservers',{token:T.token}).then(function(r){
+      var base=location.href.replace(/admin\.html.*$/,'').replace(/[^/]*$/,'');
+      var html=r.rows.map(function(o){
+        var link=base+'observe.html?t='+o.token;
+        return '<div class="card"><div class="flex" style="justify-content:space-between"><h2 style="margin:0">'+esc(o.label)+'</h2>'+
+          (o.active?'<span class="pill on">active</span>':'<span class="pill off">revoked</span>')+'</div>'+
+          (o.active?('<label class="fld">Shareable link</label><div class="linkbox">'+esc(link)+'</div>'+
+            '<div class="flex" style="margin-top:10px"><button class="btn small" data-copy="'+esc(link)+'">Copy link</button>'+
+            '<a class="btn small" target="_blank" href="'+esc(link)+'">Open</a></div>'):'')+
+          '<button class="btn small" style="margin-top:12px" data-toggle-obs="'+esc(o.token)+'">'+(o.active?'Revoke':'Re-activate')+'</button></div>';
+      }).join('');
+      document.getElementById('o-list').innerHTML=html||'<div class="card hint">No observer links yet.</div>';
+      document.querySelectorAll('[data-toggle-obs]').forEach(function(b){ b.onclick=function(){ A.api('toggleObserver',{token:T.token,observer:b.dataset.toggleObs}).then(loadObservers); }; });
+      document.querySelectorAll('[data-copy]').forEach(function(b){ b.onclick=function(){ navigator.clipboard.writeText(b.dataset.copy); b.textContent='Copied!'; setTimeout(function(){b.textContent='Copy link';},1500); }; });
+    });
+  }
+  document.getElementById('o-create').onclick=function(){
+    A.api('createObserver',{token:T.token,label:document.getElementById('o-label').value.trim()})
+      .then(function(){ document.getElementById('o-label').value=''; loadObservers(); }).catch(function(e){ msg('o-msg',e.message,true); });
+  };
+
+  function msg(id,text,bad){ document.getElementById(id).innerHTML='<div class="'+(bad?'error':'ok-msg')+'">'+esc(text)+'</div>'; }
+  function stamp(){ var d=new Date(); return d.toISOString().slice(0,19).replace(/[:T]/g,''); }
+  function toLocalInput(iso){ try{var d=new Date(iso);var off=d.getTimezoneOffset();var l=new Date(d.getTime()-off*60000);return l.toISOString().slice(0,16);}catch(e){return '';} }
+})();
+</script>
+</body>
+</html>
