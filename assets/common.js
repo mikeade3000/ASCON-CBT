@@ -2,27 +2,47 @@
 (function (w) {
   var CFG = w.ASCON_CONFIG || {};
 
+  // Actions that MUST NOT be auto-retried (they are not idempotent — a retry
+  // could create a duplicate link/admin, double-toggle, or upload a scan twice).
+  var NO_RETRY = { createObserver:1, createAdmin:1, toggleObserver:1, toggleAdmin:1,
+                   theoryUpload:1, theoryDeleteScan:1 };
+
+  function wait(ms){ return new Promise(function (res) { setTimeout(res, ms); }); }
+
   // Apps Script + GitHub Pages: POST a plain-text body (a "simple request")
   // so the browser skips the CORS preflight that Apps Script can't answer.
+  // Apps Script's POST endpoint occasionally fails to deliver a response even
+  // though it ran the request (a redirect/cold-start hiccup), which used to show
+  // a scary "could not reach" error while the backend had actually advanced.
+  // For idempotent actions we retry a couple of times so the client recovers.
   function api(action, payload) {
     payload = payload || {};
     payload.action = action;
-    return fetch(CFG.API_URL, {
-      method: 'POST',
-      redirect: 'follow',
-      body: JSON.stringify(payload)   // no custom headers -> text/plain -> no preflight
-    }).then(function (r) { return r.text(); })
-      .then(function (text) {
-        var j;
-        try { j = JSON.parse(text); }
-        catch (e) {
-          // The server returned HTML (a Google sign-in / error page) instead of JSON.
-          // Almost always a deployment-access problem, not a candidate problem.
-          throw new Error('Could not reach the exam service. Please check your connection and try again. If this continues, the administrator needs to re-publish the Apps Script with access set to “Anyone”.');
-        }
-        if (j && j.error) throw new Error(j.error);
-        return j;
-      });
+    var maxTries = NO_RETRY[action] ? 1 : 3;
+
+    function attempt(n) {
+      return fetch(CFG.API_URL, {
+        method: 'POST',
+        redirect: 'follow',
+        body: JSON.stringify(payload)   // no custom headers -> text/plain -> no preflight
+      }).then(function (r) { return r.text(); })
+        .then(function (text) {
+          var j;
+          try { j = JSON.parse(text); }
+          catch (e) {
+            // The server returned HTML (a Google sign-in / error page) instead of JSON.
+            if (n < maxTries) return wait(400 * n).then(function () { return attempt(n + 1); });
+            throw new Error('Could not reach the exam service. Please check your connection and try again. If this continues, the administrator needs to re-publish the Apps Script with “Who has access” set to “Anyone”.');
+          }
+          if (j && j.error) throw new Error(j.error);   // a real server decision — never retry
+          return j;
+        }, function (networkErr) {
+          // fetch itself failed (dropped connection / redirect glitch) — retry.
+          if (n < maxTries) return wait(400 * n).then(function () { return attempt(n + 1); });
+          throw new Error('Could not reach the exam service — this is usually a brief network glitch. Please tap the button again. If it keeps happening, check your internet connection.');
+        });
+    }
+    return attempt(1);
   }
 
   // Minimal, correct CSV parser (handles quoted fields, commas, newlines).
