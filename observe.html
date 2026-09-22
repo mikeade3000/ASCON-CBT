@@ -39,8 +39,15 @@
   if(!token){ document.getElementById('obad').classList.remove('hidden'); return; }
 
   function statCard(n,l){ return '<div class="stat"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
-  function stepPill(s){ var map={password:['Not started','off'],instructions:['Reading','on'],confirm:['Confirming','on'],exam_info:['Start screen','on'],exam:['Writing','mid'],submitted:['Submitted','sub']};
-    var v=map[s]||[s,'off']; return '<span class="pill '+v[1]+'">'+esc(v[0])+'</span>'; }
+  function pill(t,c){ return '<span class="pill '+c+'">'+esc(t)+'</span>'; }
+  function liveStatus(c){
+    if(c.theory_step==='theory_submitted') return pill('Completed (A+B)','sub');
+    if(c.theory_step==='theory') return c.online?pill('Theory in progress','mid'):pill('Left during theory','left');
+    if(c.step==='submitted') return pill('MCQ submitted','sub');
+    var active={instructions:['Reading','Left (instructions)'],confirm:['Confirming','Left (confirming)'],exam_info:['Start screen','Left (start screen)'],exam:['Writing','Left (writing)']};
+    if(active[c.step]) return c.online?pill(active[c.step][0], c.step==='exam'?'mid':'on'):pill(active[c.step][1],'left');
+    return pill('Not started','off');
+  }
   function fmtTime(t){ if(!t) return '—'; try{return new Date(t).toLocaleString();}catch(e){return '—';} }
 
   function load(){
@@ -48,10 +55,10 @@
       document.getElementById('obody').classList.remove('hidden');
       var s=r.stats;
       document.getElementById('o-stats').innerHTML=
-        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted');
+        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted')+statCard(s.left||0,'Left');
       var body=r.rows.map(function(c){
         var loc=(c.geo_lat&&c.geo_lng)?'<a target="_blank" href="https://maps.google.com/?q='+c.geo_lat+','+c.geo_lng+'">map</a>':(c.geo_status||'—');
-        return '<tr><td><b>'+esc(c.full_name)+'</b></td><td>'+esc(c.exam_taker_id)+'</td><td>'+stepPill(c.step)+'</td>'+
+        return '<tr><td><b>'+esc(c.full_name)+'</b></td><td>'+esc(c.exam_taker_id)+'</td><td>'+liveStatus(c)+'</td>'+
           '<td>'+c.answered+' / '+c.total_q+'</td>'+
           '<td>'+(c.online?'<span class="pill on">yes</span>':'<span class="pill off">no</span>')+'</td>'+
           '<td>'+(c.focus_loss>0?'<span class="pill mid">'+c.focus_loss+'</span>':'0')+'</td>'+

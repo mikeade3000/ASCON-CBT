@@ -221,9 +221,19 @@
   });
 
   function statCard(n,l){ return '<div class="stat"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+  function pill(t,c){ return '<span class="pill '+c+'">'+esc(t)+'</span>'; }
   function stepPill(s){ var map={password:['Not started','off'],instructions:['Reading instructions','on'],confirm:['Confirming','on'],exam_info:['On start screen','on'],exam:['Writing paper','mid'],submitted:['MCQ submitted','sub']};
-    var v=map[s]||[s,'off']; return '<span class="pill '+v[1]+'">'+esc(v[0])+'</span>'; }
-  function theoryPill(s){ if(s==='theory') return '<span class="pill mid">Theory in progress</span>'; if(s==='theory_submitted') return '<span class="pill sub">Theory submitted</span>'; return '<span class="pill off">—</span>'; }
+    var v=map[s]||[s,'off']; return pill(v[0],v[1]); }
+  function theoryPill(s){ if(s==='theory') return pill('Theory in progress','mid'); if(s==='theory_submitted') return pill('Theory submitted','sub'); return pill('—','off'); }
+  // Live status = where they are, but if they've gone offline before finishing, say they LEFT.
+  function liveStatus(c){
+    if(c.theory_step==='theory_submitted') return pill('Completed (A+B)','sub');
+    if(c.theory_step==='theory') return c.online?pill('Theory in progress','mid'):pill('Left during theory','left');
+    if(c.step==='submitted') return pill('MCQ submitted','sub');
+    var active={instructions:['Reading instructions','Left (instructions)'],confirm:['Confirming','Left (confirming)'],exam_info:['On start screen','Left (start screen)'],exam:['Writing','Left (writing)']};
+    if(active[c.step]) return c.online?pill(active[c.step][0], c.step==='exam'?'mid':'on'):pill(active[c.step][1],'left');
+    return pill('Not started','off');
+  }
   function fmtTime(t){ if(!t) return '—'; try{return new Date(t).toLocaleString();}catch(e){return '—';} }
 
   /* ---- dashboard ---- */
@@ -235,7 +245,7 @@
     });
     A.api('monitor',{token:T.token}).then(function(r){
       var s=r.stats; document.getElementById('d-stats').innerHTML=
-        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted');
+        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted')+statCard(s.left||0,'Left');
     });
   }
 
@@ -244,10 +254,10 @@
     A.api('monitor',{token:T.token}).then(function(r){
       var s=r.stats;
       document.getElementById('m-stats').innerHTML=
-        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted');
+        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted')+statCard(s.left||0,'Left');
       var body=r.rows.map(function(c){
         var loc=(c.geo_lat&&c.geo_lng)?'<a target="_blank" href="https://maps.google.com/?q='+c.geo_lat+','+c.geo_lng+'">map</a>':(c.geo_status||'—');
-        return '<tr><td><b>'+esc(c.full_name)+'</b></td><td>'+esc(c.exam_taker_id)+'</td><td>'+stepPill(c.step)+'</td>'+
+        return '<tr><td><b>'+esc(c.full_name)+'</b></td><td>'+esc(c.exam_taker_id)+'</td><td>'+liveStatus(c)+'</td>'+
           '<td>'+c.answered+' / '+c.total_q+'</td>'+
           '<td>'+(c.online?'<span class="pill on">yes</span>':'<span class="pill off">no</span>')+'</td>'+
           '<td>'+(c.focus_loss>0?'<span class="pill mid">'+c.focus_loss+'</span>':'0')+'</td>'+

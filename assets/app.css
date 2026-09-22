@@ -101,7 +101,7 @@ th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
 th{background:#f4f7fc;color:var(--navy);font-size:13px;text-transform:uppercase;letter-spacing:.4px}
 tr:hover td{background:#fafcff}
 .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800}
-.pill.on{background:#e5f6ec;color:#155e37}.pill.mid{background:#fff3d6;color:#8a6d00}.pill.off{background:#eef1f7;color:#5a6b85}.pill.sub{background:#e7edfb;color:#13315c}
+.pill.on{background:#e5f6ec;color:#155e37}.pill.mid{background:#fff3d6;color:#8a6d00}.pill.off{background:#eef1f7;color:#5a6b85}.pill.sub{background:#e7edfb;color:#13315c}.pill.left{background:#fdecea;color:#9b2314}
 .linkbox{background:#0a1f3d;color:#fff;padding:12px 14px;border-radius:9px;font-family:monospace;word-break:break-all;font-size:14px}
 .flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .panel-input{width:100%;padding:11px 13px;border:2px solid var(--line);border-radius:9px;font-size:16px}
