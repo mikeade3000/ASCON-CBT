@@ -29,6 +29,7 @@
     <button class="tab" data-tab="monitor">Live Monitor</button>
     <button class="tab" data-tab="upload">Uploads</button>
     <button class="tab" data-tab="results">Results</button>
+    <button class="tab" data-tab="marking">Theory Marking</button>
     <button class="tab" data-tab="settings">Settings</button>
     <button class="tab super hidden" data-tab="admins">Admins</button>
     <button class="tab super hidden" data-tab="observers">Observer Links</button>
@@ -77,10 +78,17 @@
       </div>
       <div class="card">
         <h2>3 · Questions bank</h2>
-        <p class="hint">Columns: <code>question_id, area, question_text, option_a, option_b, option_c, option_d, correct_answer, marks</code></p>
+        <p class="hint">Columns: <code>question_id, area, question_text, option_a, option_b, option_c, option_d, correct_answer, marks</code>. Use the area names in the blueprint (Professional, Current Affairs, English Language, ASCON/Public Service Rules, Financial Regulation).</p>
         <input type="file" id="f-q" accept=".csv" class="panel-input">
         <button class="btn small" style="margin-top:10px" data-up="questions" data-file="f-q">Upload questions</button>
         <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/questions.csv" download>Sample</a>
+      </div>
+      <div class="card">
+        <h2>4 · Theory (Part B) questions</h2>
+        <p class="hint">Columns: <code>theory_id, number, prompt, model_answer, max_marks</code>. The model answer is used by markers and is never shown to candidates.</p>
+        <input type="file" id="f-theory" accept=".csv" class="panel-input">
+        <button class="btn small" style="margin-top:10px" data-up="theory" data-file="f-theory">Upload theory questions</button>
+        <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/theory-questions.csv" download>Sample</a>
       </div>
     </div>
 
@@ -91,14 +99,22 @@
         <button class="btn small" id="dl-activity">⬇ Download activity log (CSV)</button>
       </div></div>
       <div class="card"><div style="overflow-x:auto"><table id="r-tbl"><thead><tr>
-        <th>Name</th><th>ID</th><th>Promotion</th><th>Grade</th><th>Answered</th><th>Score</th><th>Status</th><th>Submitted</th>
+        <th>Name</th><th>ID</th><th>Promotion</th><th>MCQ (A)</th><th>Theory (B)</th><th>Total</th><th>Status</th><th>Submitted</th>
       </tr></thead><tbody></tbody></table></div></div>
+    </div>
+
+    <div id="t-marking" class="tabpage hidden">
+      <h1>Theory Marking</h1>
+      <p class="hint">Open each candidate’s scanned answer sheets, compare with the model answers, and enter marks per question. The system totals them and adds them to the MCQ score.</p>
+      <div id="mk-msg"></div>
+      <div id="mk-list"></div>
     </div>
 
     <div id="t-settings" class="tabpage hidden">
       <h1>Settings</h1>
       <div id="s-msg"></div>
       <div class="card">
+        <h2>Part A — MCQ</h2>
         <label class="fld">Examination title</label><input id="set-title" class="panel-input">
         <label class="fld">Duration (minutes)</label><input id="set-duration" class="panel-input" type="number" min="1">
         <label class="fld">Scheduled start (leave blank to open immediately)</label><input id="set-start" class="panel-input" type="datetime-local">
@@ -106,8 +122,21 @@
         <label class="fld"><input id="set-shuffle" type="checkbox"> Shuffle questions per candidate</label>
         <label class="fld">Instructions (HTML)</label><textarea id="set-ins" class="panel-input" style="min-height:120px"></textarea>
         <label class="fld">Terms (HTML)</label><textarea id="set-terms" class="panel-input" style="min-height:100px"></textarea>
-        <button class="btn small" id="save-settings" style="margin-top:16px">Save settings</button>
       </div>
+      <div class="card">
+        <h2>Paper blueprint (questions per area)</h2>
+        <p class="hint">How many questions to draw from each area for every candidate. Total must not exceed the questions available in each area.</p>
+        <div id="bp-rows"></div>
+        <button class="btn small" id="bp-add" style="margin-top:8px;background:#eef2fa;color:var(--navy2)">+ Add area</button>
+        <div class="hint" id="bp-total" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
+        <h2>Part B — Theory</h2>
+        <label class="fld"><input id="set-theory-on" type="checkbox"> Enable Theory (Part B) after the MCQ</label>
+        <label class="fld">Theory duration (minutes)</label><input id="set-theory-dur" class="panel-input" type="number" min="1">
+        <label class="fld">Theory instructions (HTML)</label><textarea id="set-theory-ins" class="panel-input" style="min-height:110px"></textarea>
+      </div>
+      <button class="btn small" id="save-settings" style="margin-top:4px">Save all settings</button>
     </div>
 
     <div id="t-admins" class="tabpage hidden">
@@ -184,6 +213,7 @@
       if(tab==='dashboard') loadDashboard();
       if(tab==='monitor'){ loadMonitor(); monTimer=setInterval(loadMonitor, (A.CFG.SYNC_SECONDS?10000:10000)); }
       if(tab==='results') loadResults();
+      if(tab==='marking') loadMarking();
       if(tab==='settings') loadSettings();
       if(tab==='admins') loadAdmins();
       if(tab==='observers') loadObservers();
@@ -191,8 +221,9 @@
   });
 
   function statCard(n,l){ return '<div class="stat"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
-  function stepPill(s){ var map={password:['Not started','off'],instructions:['Reading instructions','on'],confirm:['Confirming','on'],exam_info:['On start screen','on'],exam:['Writing paper','mid'],submitted:['Submitted','sub']};
+  function stepPill(s){ var map={password:['Not started','off'],instructions:['Reading instructions','on'],confirm:['Confirming','on'],exam_info:['On start screen','on'],exam:['Writing paper','mid'],submitted:['MCQ submitted','sub']};
     var v=map[s]||[s,'off']; return '<span class="pill '+v[1]+'">'+esc(v[0])+'</span>'; }
+  function theoryPill(s){ if(s==='theory') return '<span class="pill mid">Theory in progress</span>'; if(s==='theory_submitted') return '<span class="pill sub">Theory submitted</span>'; return '<span class="pill off">—</span>'; }
   function fmtTime(t){ if(!t) return '—'; try{return new Date(t).toLocaleString();}catch(e){return '—';} }
 
   /* ---- dashboard ---- */
@@ -235,7 +266,8 @@
       var reader=new FileReader();
       reader.onload=function(){
         var rows=A.parseCSV(reader.result);
-        var action=kind==='candidates'?'uploadCandidates':(kind==='assign'?'uploadAssign':'uploadQuestions');
+        var actionMap={candidates:'uploadCandidates',assign:'uploadAssign',questions:'uploadQuestions',theory:'uploadTheory'};
+        var action=actionMap[kind];
         btn.disabled=true; btn.textContent='Uploading…';
         A.api(action,{token:T.token, rows:rows}).then(function(r){
           msg('u-msg','Processed '+r.processed+' row(s).',false);
@@ -252,18 +284,21 @@
     A.api('results',{token:T.token}).then(function(r){
       lastResults=r.rows;
       var body=r.rows.map(function(x){
+        var theory = (x.theory_total===''||x.theory_total==null) ? ('<span class="hint">'+(x.theory_scans?('unmarked · '+x.theory_scans+' pages'):'—')+'</span>') : ('<b>'+x.theory_total+'</b>');
         return '<tr><td><b>'+esc(x.full_name)+'</b></td><td>'+esc(x.exam_taker_id)+'</td>'+
-          '<td>'+esc(x.promotion_post||'—')+'</td><td>'+esc(x.promotion_grade_level||'—')+'</td>'+
-          '<td>'+x.answered+' / '+x.total_q+'</td><td><b>'+x.score+'</b> / '+x.max_score+'</td>'+
-          '<td>'+stepPill(x.step)+'</td><td>'+fmtTime(x.submitted_at)+'</td></tr>';
+          '<td>'+esc(x.promotion_post||'—')+'</td>'+
+          '<td><b>'+x.score+'</b> / '+x.max_score+'</td>'+
+          '<td>'+theory+'</td>'+
+          '<td><b>'+x.grand_total+'</b></td>'+
+          '<td>'+stepPill(x.step)+' '+theoryPill(x.theory_step)+'</td><td>'+fmtTime(x.submitted_at)+'</td></tr>';
       }).join('');
       document.querySelector('#r-tbl tbody').innerHTML=body||'<tr><td colspan="8" class="hint">No candidates yet.</td></tr>';
     });
   }
   document.getElementById('dl-results').onclick=function(){
-    var head=['Exam Taker ID','Full Name','Present Post','Promotion Post','Grade Level','Location','Status','Answered','Total','Score','Max Score','Focus Loss','GPS','Logged In','Started','Submitted'];
+    var head=['Exam Taker ID','Full Name','Present Post','Promotion Post','Grade Level','Location','Status','Answered','Total Q','MCQ Score','MCQ Max','Theory Total','Grand Total','Theory Pages','Focus Loss','GPS','Logged In','Started','MCQ Submitted','Theory Submitted'];
     A.api('results',{token:T.token}).then(function(r){
-      var rows=r.rows.map(function(x){return [x.exam_taker_id,x.full_name,x.present_post,x.promotion_post,x.promotion_grade_level,x.exam_location,x.step,x.answered,x.total_q,x.score,x.max_score,x.focus_loss,x.geo,x.logged_in_at,x.started_at,x.submitted_at];});
+      var rows=r.rows.map(function(x){return [x.exam_taker_id,x.full_name,x.present_post,x.promotion_post,x.promotion_grade_level,x.exam_location,x.step,x.answered,x.total_q,x.score,x.max_score,x.theory_total,x.grand_total,x.theory_scans,x.focus_loss,x.geo,x.logged_in_at,x.started_at,x.submitted_at,x.theory_submitted_at];});
       A.download('ascon-results-'+stamp()+'.csv', A.toCSV(head,rows));
     });
   };
@@ -273,6 +308,41 @@
       A.download('ascon-activity-'+stamp()+'.csv', A.toCSV(['Time','Event','Exam Taker ID','Detail'],rows));
     });
   };
+
+  /* ---- theory marking ---- */
+  function loadMarking(){
+    A.api('marking',{token:T.token}).then(function(r){
+      var qs=r.questions||[];
+      if(!qs.length){ document.getElementById('mk-list').innerHTML='<div class="card hint">No theory questions uploaded yet. Add them under Uploads → Theory (Part B) questions.</div>'; return; }
+      if(!r.rows.length){ document.getElementById('mk-list').innerHTML='<div class="card hint">No candidates have started Theory (Part B) yet.</div>'; return; }
+      var html=r.rows.map(function(c){
+        var scans=(c.scans||[]).map(function(s){ return '<a class="btn small" target="_blank" href="'+esc(s.url)+'">Page '+(s.page||'')+'</a>'; }).join(' ') || '<span class="hint">no pages uploaded</span>';
+        var qrows=qs.map(function(q){
+          var cur=(c.scores&&c.scores[q.theory_id]!=null)?c.scores[q.theory_id]:'';
+          return '<tr><td><b>Q'+esc(q.number)+'.</b> '+esc(q.prompt)+'</td>'+
+            '<td class="hint" style="max-width:320px">'+esc(q.model_answer||'')+'</td>'+
+            '<td style="white-space:nowrap"><input type="number" min="0" max="'+q.max_marks+'" value="'+cur+'" data-tid="'+esc(q.theory_id)+'" class="mk-score" style="width:64px;padding:6px;border:2px solid var(--line);border-radius:6px"> / '+q.max_marks+'</td></tr>';
+        }).join('');
+        return '<div class="card" data-cand="'+esc(c.exam_taker_id)+'">'+
+          '<div class="flex" style="justify-content:space-between"><h2 style="margin:0">'+esc(c.full_name)+' <span class="hint">('+esc(c.exam_taker_id)+')</span></h2>'+theoryPill(c.theory_step)+'</div>'+
+          '<div style="margin:8px 0"><b>Scanned answer sheets:</b> '+scans+'</div>'+
+          '<div style="overflow-x:auto"><table><thead><tr><th>Question</th><th>Model answer</th><th>Mark</th></tr></thead><tbody>'+qrows+'</tbody></table></div>'+
+          '<div class="flex" style="margin-top:10px"><button class="btn small mk-save">Save marks</button> <span class="mk-total hint"></span></div>'+
+          '</div>';
+      }).join('');
+      document.getElementById('mk-list').innerHTML=html;
+      document.querySelectorAll('.mk-save').forEach(function(btn){
+        btn.onclick=function(){
+          var card=btn.closest('[data-cand]'), id=card.dataset.cand, scores={};
+          card.querySelectorAll('.mk-score').forEach(function(inp){ if(inp.value!=='') scores[inp.dataset.tid]=parseInt(inp.value,10)||0; });
+          btn.disabled=true; btn.textContent='Saving…';
+          A.api('saveTheoryScore',{token:T.token, exam_taker_id:id, scores:scores}).then(function(r){
+            card.querySelector('.mk-total').textContent='Total: '+r.total;
+          }).catch(function(e){ alert(e.message); }).finally(function(){ btn.disabled=false; btn.textContent='Save marks'; });
+        };
+      });
+    }).catch(function(e){ document.getElementById('mk-list').innerHTML='<div class="card"><div class="error">'+esc(e.message)+'</div></div>'; });
+  }
 
   /* ---- settings ---- */
   function loadSettings(){
@@ -285,10 +355,42 @@
       document.getElementById('set-shuffle').checked=s.shuffle_questions!=='0';
       document.getElementById('set-ins').value=s.instructions_html||'';
       document.getElementById('set-terms').value=s.terms_html||'';
+      document.getElementById('set-theory-on').checked=s.theory_enabled!=='0';
+      document.getElementById('set-theory-dur').value=s.theory_duration_minutes||60;
+      document.getElementById('set-theory-ins').value=s.theory_instructions_html||'';
+      var bp=[]; try{ bp=JSON.parse(s.area_blueprint||'[]'); }catch(e){}
+      renderBlueprint(bp);
     });
   }
+  function renderBlueprint(bp){
+    var box=document.getElementById('bp-rows'); box.innerHTML='';
+    (bp||[]).forEach(function(b){ addBpRow(b.area,b.count); });
+    if(!bp||!bp.length) addBpRow('',0);
+    bpTotal();
+  }
+  function addBpRow(area,count){
+    var row=document.createElement('div'); row.className='flex bp-row'; row.style.marginTop='6px';
+    row.innerHTML='<input class="panel-input bp-area" style="flex:2" placeholder="Area name" value="'+esc(area||'')+'">'+
+      '<input class="panel-input bp-count" type="number" min="0" style="flex:0 0 110px" placeholder="count" value="'+(count!=null?count:'')+'">'+
+      '<button class="btn small bp-del" style="background:#fdecea;color:var(--bad)">✕</button>';
+    document.getElementById('bp-rows').appendChild(row);
+    row.querySelector('.bp-del').onclick=function(){ row.remove(); bpTotal(); };
+    row.querySelector('.bp-count').oninput=bpTotal;
+    bpTotal();
+  }
+  function bpTotal(){
+    var t=0; document.querySelectorAll('.bp-count').forEach(function(i){ t+=parseInt(i.value||'0',10)||0; });
+    document.getElementById('bp-total').textContent='Total questions per candidate: '+t;
+  }
+  document.getElementById('bp-add').onclick=function(){ addBpRow('',0); };
   document.getElementById('save-settings').onclick=function(){
     var startVal=document.getElementById('set-start').value;
+    var bp=[];
+    document.querySelectorAll('.bp-row').forEach(function(row){
+      var area=row.querySelector('.bp-area').value.trim();
+      var count=parseInt(row.querySelector('.bp-count').value||'0',10)||0;
+      if(area) bp.push({area:area, count:count});
+    });
     var settings={
       exam_title:document.getElementById('set-title').value,
       duration_minutes:String(parseInt(document.getElementById('set-duration').value||'60',10)),
@@ -296,9 +398,14 @@
       require_location:document.getElementById('set-loc').checked?'1':'0',
       shuffle_questions:document.getElementById('set-shuffle').checked?'1':'0',
       instructions_html:document.getElementById('set-ins').value,
-      terms_html:document.getElementById('set-terms').value
+      terms_html:document.getElementById('set-terms').value,
+      area_blueprint:JSON.stringify(bp),
+      theory_enabled:document.getElementById('set-theory-on').checked?'1':'0',
+      theory_duration_minutes:String(parseInt(document.getElementById('set-theory-dur').value||'60',10)),
+      theory_instructions_html:document.getElementById('set-theory-ins').value
     };
-    A.api('saveSettings',{token:T.token, settings:settings}).then(function(){ msg('s-msg','Settings saved.',false); }).catch(function(e){ msg('s-msg',e.message,true); });
+    var b=this; b.disabled=true; b.textContent='Saving…';
+    A.api('saveSettings',{token:T.token, settings:settings}).then(function(){ msg('s-msg','Settings saved.',false); }).catch(function(e){ msg('s-msg',e.message,true); }).finally(function(){ b.disabled=false; b.textContent='Save all settings'; });
   };
 
   /* ---- admins (super) ---- */
