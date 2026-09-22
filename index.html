@@ -166,7 +166,10 @@
       <h2 style="margin-top:0">Upload your answer sheets</h2>
       <p class="note">Take a clear photo of each written page and upload it. You can upload several pages.</p>
       <input id="th-file" type="file" accept="image/*" capture="environment" multiple style="font-size:17px">
-      <div id="th-uploading" class="hint hidden" style="margin-top:8px">Uploading…</div>
+      <div id="th-progress" class="uploadprog hidden">
+        <div class="uploadbar"><div id="th-bar" class="uploadbar-fill"></div></div>
+        <div id="th-proglbl" class="hint"></div>
+      </div>
       <div id="th-scans" class="scanwrap"></div>
     </div>
   </div>
@@ -506,14 +509,31 @@
   }
   document.getElementById('th-file').onchange=function(e){
     var files=Array.prototype.slice.call(e.target.files||[]); if(!files.length) return;
-    var busy=document.getElementById('th-uploading'); busy.classList.remove('hidden');
-    var page=thScans.length;
+    var prog=document.getElementById('th-progress'), bar=document.getElementById('th-bar'), lbl=document.getElementById('th-proglbl');
+    var total=files.length, done=0, page=thScans.length;
+    prog.classList.remove('hidden'); bar.style.width='0%'; bar.classList.remove('err');
+    function setBar(overall, text){ bar.style.width=Math.max(2,Math.round(overall*100))+'%'; lbl.textContent=text; }
     (function next(){
-      if(!files.length){ busy.classList.add('hidden'); document.getElementById('th-file').value=''; return; }
-      var f=files.shift(); page++;
+      if(!files.length){
+        setBar(1, total>1? ('All '+total+' pages uploaded ✓') : 'Page uploaded ✓');
+        setTimeout(function(){ prog.classList.add('hidden'); bar.style.width='0%'; }, 900);
+        document.getElementById('th-file').value=''; return;
+      }
+      var f=files.shift(); page++; done++;
+      var baseFrac=(done-1)/total;
+      setBar(baseFrac, 'Preparing page '+done+' of '+total+'…');
       compressImage(f, function(dataUrl){
-        A.api('theoryUpload',{token:S.token, page:page, image:dataUrl}).then(function(r){ thScans=r.scans||[]; renderScans(); next(); })
-          .catch(function(err){ alert('Upload failed: '+err.message+'\n\nIf uploads keep failing here (but the rest of the exam worked), the administrator needs to authorise Google Drive access for the exam — this is required to store scanned answer sheets.'); busy.classList.add('hidden'); });
+        A.apiUpload('theoryUpload',{token:S.token, page:page, image:dataUrl}, function(frac){
+          // frac is 0..1 for THIS file; map into its slice of the whole batch
+          setBar((done-1+frac)/total, 'Uploading page '+done+' of '+total+' — '+Math.round(frac*100)+'%');
+        }).then(function(r){
+          thScans=r.scans||[]; renderScans();
+          setBar(done/total, 'Saved page '+done+' of '+total+' ✓');
+          next();
+        }).catch(function(err){
+          bar.classList.add('err'); lbl.textContent='Upload failed';
+          alert('Upload failed: '+err.message+'\n\nIf uploads keep failing here (but the rest of the exam worked), the administrator needs to authorise Google Drive access for the exam — this is required to store scanned answer sheets.');
+        });
       });
     })();
   };

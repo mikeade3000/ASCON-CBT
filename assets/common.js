@@ -92,8 +92,34 @@
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }
 
+  // Upload with a real progress callback. fetch() can't report upload progress,
+  // so this uses XMLHttpRequest. Sending a plain string keeps it a "simple"
+  // request (text/plain), avoiding the CORS preflight Apps Script can't answer.
+  function apiUpload(action, payload, onProgress) {
+    payload = payload || {}; payload.action = action;
+    return new Promise(function (resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', CFG.API_URL, true);
+      if (xhr.upload) {
+        xhr.upload.onprogress = function (e) { if (onProgress && e.lengthComputable) onProgress(e.loaded / e.total); };
+        xhr.upload.onload = function () { if (onProgress) onProgress(1); };   // bytes sent; awaiting server
+      }
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) return;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          var j; try { j = JSON.parse(xhr.responseText); }
+          catch (e) { reject(new Error('Could not reach the exam service. Please try again.')); return; }
+          if (j && j.error) { reject(new Error(j.error)); return; }
+          resolve(j);
+        } else { reject(new Error('Upload failed — the server could not be reached. Please try again.')); }
+      };
+      xhr.onerror = function () { reject(new Error('Upload failed — network error. Please try again.')); };
+      xhr.send(JSON.stringify(payload));
+    });
+  }
+
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
   function configured() { return CFG.API_URL && CFG.API_URL.indexOf('PASTE_YOUR') !== 0; }
 
-  w.ASCON = { api: api, parseCSV: parseCSV, toCSV: toCSV, download: download, esc: esc, CFG: CFG, configured: configured };
+  w.ASCON = { api: api, apiUpload: apiUpload, parseCSV: parseCSV, toCSV: toCSV, download: download, esc: esc, CFG: CFG, configured: configured };
 })(window);
