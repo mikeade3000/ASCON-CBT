@@ -245,7 +245,7 @@
     });
     A.api('monitor',{token:T.token}).then(function(r){
       var s=r.stats; document.getElementById('d-stats').innerHTML=
-        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted')+statCard(s.left||0,'Left');
+        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted')+statCard(s.completed||0,'Completed')+statCard(s.left||0,'Left');
     });
   }
 
@@ -254,7 +254,7 @@
     A.api('monitor',{token:T.token}).then(function(r){
       var s=r.stats;
       document.getElementById('m-stats').innerHTML=
-        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted')+statCard(s.left||0,'Left');
+        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted')+statCard(s.completed||0,'Completed')+statCard(s.left||0,'Left');
       var body=r.rows.map(function(c){
         var loc=(c.geo_lat&&c.geo_lng)?'<a target="_blank" href="https://maps.google.com/?q='+c.geo_lat+','+c.geo_lng+'">map</a>':(c.geo_status||'—');
         return '<tr><td><b>'+esc(c.full_name)+'</b></td><td>'+esc(c.exam_taker_id)+'</td><td>'+liveStatus(c)+'</td>'+
@@ -323,32 +323,47 @@
   function loadMarking(){
     A.api('marking',{token:T.token}).then(function(r){
       var qs=r.questions||[];
-      if(!qs.length){ document.getElementById('mk-list').innerHTML='<div class="card hint">No theory questions uploaded yet. Add them under Uploads → Theory (Part B) questions.</div>'; return; }
-      if(!r.rows.length){ document.getElementById('mk-list').innerHTML='<div class="card hint">No candidates have started Theory (Part B) yet.</div>'; return; }
+      var box=document.getElementById('mk-list');
+      if(!r.rows.length){
+        box.innerHTML='<div class="card hint">No candidate has submitted or uploaded any Theory (Part B) answer sheets yet.'+
+          (qs.length?'':' <br><br>Tip: you can also upload the theory question set (with model answers) under <b>Uploads → Theory (Part B) questions</b> to enable per-question marking.')+'</div>';
+        return;
+      }
+      var banner = qs.length ? '' :
+        '<div class="card" style="border-left:4px solid var(--gold)"><b>No theory question set uploaded.</b> You can still open each candidate’s scanned pages below and enter an <b>overall</b> Part B mark. To mark question-by-question against model answers, upload the set under <b>Uploads → Theory (Part B) questions</b>.</div>';
       var html=r.rows.map(function(c){
         var scans=(c.scans||[]).map(function(s){ return '<a class="btn small" target="_blank" href="'+esc(s.url)+'">Page '+(s.page||'')+'</a>'; }).join(' ') || '<span class="hint">no pages uploaded</span>';
-        var qrows=qs.map(function(q){
-          var cur=(c.scores&&c.scores[q.theory_id]!=null)?c.scores[q.theory_id]:'';
-          return '<tr><td><b>Q'+esc(q.number)+'.</b> '+esc(q.prompt)+'</td>'+
-            '<td class="hint" style="max-width:320px">'+esc(q.model_answer||'')+'</td>'+
-            '<td style="white-space:nowrap"><input type="number" min="0" max="'+q.max_marks+'" value="'+cur+'" data-tid="'+esc(q.theory_id)+'" class="mk-score" style="width:64px;padding:6px;border:2px solid var(--line);border-radius:6px"> / '+q.max_marks+'</td></tr>';
-        }).join('');
+        var body, curTotal=(c.theory_total!==''&&c.theory_total!=null)?c.theory_total:'';
+        if(qs.length){
+          var qrows=qs.map(function(q){
+            var cur=(c.scores&&c.scores[q.theory_id]!=null)?c.scores[q.theory_id]:'';
+            return '<tr><td><b>Q'+esc(q.number)+'.</b> '+esc(q.prompt)+'</td>'+
+              '<td class="hint" style="max-width:320px">'+esc(q.model_answer||'')+'</td>'+
+              '<td style="white-space:nowrap"><input type="number" min="0" max="'+q.max_marks+'" value="'+cur+'" data-tid="'+esc(q.theory_id)+'" class="mk-score" style="width:64px;padding:6px;border:2px solid var(--line);border-radius:6px"> / '+q.max_marks+'</td></tr>';
+          }).join('');
+          body='<div style="overflow-x:auto"><table><thead><tr><th>Question</th><th>Model answer</th><th>Mark</th></tr></thead><tbody>'+qrows+'</tbody></table></div>';
+        } else {
+          body='<div class="flex" style="margin-top:8px"><label class="fld" style="margin:0">Overall Part B mark:</label> '+
+            '<input type="number" min="0" class="mk-overall" value="'+curTotal+'" style="width:90px;padding:8px;border:2px solid var(--line);border-radius:8px"></div>';
+        }
         return '<div class="card" data-cand="'+esc(c.exam_taker_id)+'">'+
           '<div class="flex" style="justify-content:space-between"><h2 style="margin:0">'+esc(c.full_name)+' <span class="hint">('+esc(c.exam_taker_id)+')</span></h2>'+theoryPill(c.theory_step)+'</div>'+
           '<div style="margin:8px 0"><b>Scanned answer sheets:</b> '+scans+'</div>'+
-          '<div style="overflow-x:auto"><table><thead><tr><th>Question</th><th>Model answer</th><th>Mark</th></tr></thead><tbody>'+qrows+'</tbody></table></div>'+
-          '<div class="flex" style="margin-top:10px"><button class="btn small mk-save">Save marks</button> <span class="mk-total hint"></span></div>'+
+          body+
+          '<div class="flex" style="margin-top:10px"><button class="btn small mk-save">Save mark</button> <span class="mk-total hint">'+(curTotal!==''?'Total: '+curTotal:'')+'</span></div>'+
           '</div>';
       }).join('');
-      document.getElementById('mk-list').innerHTML=html;
+      box.innerHTML=banner+html;
       document.querySelectorAll('.mk-save').forEach(function(btn){
         btn.onclick=function(){
-          var card=btn.closest('[data-cand]'), id=card.dataset.cand, scores={};
-          card.querySelectorAll('.mk-score').forEach(function(inp){ if(inp.value!=='') scores[inp.dataset.tid]=parseInt(inp.value,10)||0; });
+          var card=btn.closest('[data-cand]'), id=card.dataset.cand, payload={token:T.token, exam_taker_id:id};
+          var ov=card.querySelector('.mk-overall');
+          if(ov){ payload.overall=(ov.value===''?0:parseInt(ov.value,10)||0); }
+          else { var scores={}; card.querySelectorAll('.mk-score').forEach(function(inp){ if(inp.value!=='') scores[inp.dataset.tid]=parseInt(inp.value,10)||0; }); payload.scores=scores; }
           btn.disabled=true; btn.textContent='Saving…';
-          A.api('saveTheoryScore',{token:T.token, exam_taker_id:id, scores:scores}).then(function(r){
+          A.api('saveTheoryScore',payload).then(function(r){
             card.querySelector('.mk-total').textContent='Total: '+r.total;
-          }).catch(function(e){ alert(e.message); }).finally(function(){ btn.disabled=false; btn.textContent='Save marks'; });
+          }).catch(function(e){ alert(e.message); }).finally(function(){ btn.disabled=false; btn.textContent='Save mark'; });
         };
       });
     }).catch(function(e){ document.getElementById('mk-list').innerHTML='<div class="card"><div class="error">'+esc(e.message)+'</div></div>'; });

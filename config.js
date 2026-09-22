@@ -11,5 +11,5 @@ window.ASCON_CONFIG = {
   // How often the browser quietly saves progress to the backend (seconds).
   // Answers are ALSO saved instantly in the browser, so this is just the
   // backup sync. Higher = less server load. 60 is a good default for 300+ users.
-  SYNC_SECONDS: 30
+  SYNC_SECONDS: 20
 };

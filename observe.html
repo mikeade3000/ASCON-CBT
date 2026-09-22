@@ -55,7 +55,7 @@
       document.getElementById('obody').classList.remove('hidden');
       var s=r.stats;
       document.getElementById('o-stats').innerHTML=
-        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted')+statCard(s.left||0,'Left');
+        statCard(s.total,'Registered')+statCard(s.logged_in,'Logged in')+statCard(s.online,'Online now')+statCard(s.in_progress,'Writing')+statCard(s.submitted,'Submitted')+statCard(s.completed||0,'Completed')+statCard(s.left||0,'Left');
       var body=r.rows.map(function(c){
         var loc=(c.geo_lat&&c.geo_lng)?'<a target="_blank" href="https://maps.google.com/?q='+c.geo_lat+','+c.geo_lng+'">map</a>':(c.geo_status||'—');
         return '<tr><td><b>'+esc(c.full_name)+'</b></td><td>'+esc(c.exam_taker_id)+'</td><td>'+liveStatus(c)+'</td>'+

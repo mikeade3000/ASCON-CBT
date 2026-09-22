@@ -334,7 +334,7 @@
   };
 
   /* ---------- 6. exam ---------- */
-  var idx=0, focusLoss=0, syncTimer=null, tickTimer=null, remaining=0, submitting=false;
+  var idx=0, focusLoss=0, syncTimer=null, tickTimer=null, remaining=0, submitting=false, phase='mcq';
 
   function prepExam(){
     var p=S.profile||{};
@@ -343,6 +343,7 @@
     S.answers = S.answers || {};
   }
   function startExam(resume){
+    phase='mcq';
     show('exam');
     // server-authoritative remaining: recompute from started_at + duration
     var dur=(S.duration_minutes||60)*60;
@@ -350,7 +351,7 @@
     renderQ(); renderPalette();
     tickTimer=setInterval(tick,1000); tick();
     scheduleSync();
-    trackFocus();
+    bindFocus();
     window.addEventListener('beforeunload', function(e){ if(!submitting){ e.preventDefault(); e.returnValue=''; } });
   }
   function renderQ(){
@@ -386,9 +387,20 @@
     t.classList.toggle('warn', remaining<=300);
     if(remaining<=0){ clearInterval(tickTimer); doSubmit(true); }
   }
+  var focusBound=false;
+  function bindFocus(){ if(focusBound) return; focusBound=true; trackFocus(); }
   function trackFocus(){
-    var warn=document.getElementById('x-warn');
-    function lost(){ focusLoss++; warn.classList.remove('hidden'); warn.textContent='⚠ Please stay on this window. Leaving the exam is recorded ('+focusLoss+').'; sync({}); }
+    function lost(){
+      focusLoss++;
+      if(phase==='theory'){
+        var tw=document.getElementById('th-warn');
+        tw.classList.remove('hidden'); tw.textContent='⚠ Please stay on this window. Leaving Part B is recorded ('+focusLoss+').';
+      } else if(phase==='mcq'){
+        var warn=document.getElementById('x-warn');
+        warn.classList.remove('hidden'); warn.textContent='⚠ Please stay on this window. Leaving the exam is recorded ('+focusLoss+').';
+      }
+      sync({});   // records focus_loss; step is only sent during the MCQ phase (see sync)
+    }
     document.addEventListener('visibilitychange', function(){ if(document.hidden) lost(); });
     window.addEventListener('blur', lost);
   }
@@ -396,12 +408,14 @@
   function scheduleSync(){
     var base=(A.CFG.SYNC_SECONDS||60)*1000;
     var jitter=Math.floor(Math.random()*8000);   // spread writes so 300 clients don't all hit the same second
-    syncTimer=setTimeout(function(){ sync({}); scheduleSync(); }, base+jitter);
+    syncTimer=setTimeout(function(){ if(phase==='mcq') sync({}); scheduleSync(); }, base+jitter);
   }
   function sync(extra){
-    var payload=Object.assign({token:S.token, answers:S.answers, focus_loss:focusLoss, step:'exam'}, extra);
+    var payload=Object.assign({token:S.token, answers:S.answers, focus_loss:focusLoss}, extra);
+    if(phase==='mcq') payload.step='exam';   // only the MCQ phase owns current_step
     if(S.geo) payload.geo=S.geo;
     return A.api('candidateSync',payload).then(function(r){
+      if(phase!=='mcq') return;   // the MCQ timer/auto-submit only applies during the MCQ
       if(r && typeof r.remaining==='number' && Math.abs(r.remaining-remaining)>5) remaining=r.remaining; // re-anchor to server
       if(r && r.remaining===0) doSubmit(true);
     }).catch(function(){ /* offline tolerated; localStorage holds answers */ });
@@ -418,6 +432,7 @@
 
   /* ---------- 7. MCQ done -> Theory Part B hand-off ---------- */
   function afterMcq(){
+    phase='mcqdone'; clearTimeout(syncTimer); clearInterval(tickTimer);
     var toTheory=document.getElementById('mcq-next-theory'), only=document.getElementById('mcq-only');
     if(S.theory_enabled){ toTheory.classList.remove('hidden'); only.classList.add('hidden'); }
     else { toTheory.classList.add('hidden'); only.classList.remove('hidden'); }
@@ -450,6 +465,8 @@
   /* ---------- 9. Theory scanning ---------- */
   var thTick=null, thRemaining=0, thScans=[];
   function startTheory(resume){
+    phase='theory';
+    bindFocus();   // proctor Part B too (covers the resume-straight-to-theory path); phase gates the sync
     show('theory');
     var p=(S.theory.profile)||{};
     document.getElementById('th-id').textContent = p.exam_taker_id||'';
@@ -496,7 +513,7 @@
       var f=files.shift(); page++;
       compressImage(f, function(dataUrl){
         A.api('theoryUpload',{token:S.token, page:page, image:dataUrl}).then(function(r){ thScans=r.scans||[]; renderScans(); next(); })
-          .catch(function(err){ alert('Upload failed: '+err.message); busy.classList.add('hidden'); });
+          .catch(function(err){ alert('Upload failed: '+err.message+'\n\nIf uploads keep failing here (but the rest of the exam worked), the administrator needs to authorise Google Drive access for the exam — this is required to store scanned answer sheets.'); busy.classList.add('hidden'); });
       });
     })();
   };
