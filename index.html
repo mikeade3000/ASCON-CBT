@@ -520,18 +520,17 @@
         document.getElementById('th-file').value=''; return;
       }
       var f=files.shift(); page++; done++;
-      var baseFrac=(done-1)/total;
-      setBar(baseFrac, 'Preparing page '+done+' of '+total+'…');
+      setBar((done-1)/total, 'Preparing page '+done+' of '+total+'…');
       compressImage(f, function(dataUrl){
-        A.apiUpload('theoryUpload',{token:S.token, page:page, image:dataUrl}, function(frac){
-          // frac is 0..1 for THIS file; map into its slice of the whole batch
-          setBar((done-1+frac)/total, 'Uploading page '+done+' of '+total+' — '+Math.round(frac*100)+'%');
-        }).then(function(r){
+        setBar((done-1+0.5)/total, 'Uploading page '+done+' of '+total+'…');
+        bar.classList.add('busy');   // indeterminate shimmer while fetch is in flight
+        A.api('theoryUpload',{token:S.token, page:page, image:dataUrl}).then(function(r){
+          bar.classList.remove('busy');
           thScans=r.scans||[]; renderScans();
           setBar(done/total, 'Saved page '+done+' of '+total+' ✓');
           next();
         }).catch(function(err){
-          bar.classList.add('err'); lbl.textContent='Upload failed';
+          bar.classList.remove('busy'); bar.classList.add('err'); lbl.textContent='Upload failed';
           alert('Upload failed: '+err.message+'\n\nIf uploads keep failing here (but the rest of the exam worked), the administrator needs to authorise Google Drive access for the exam — this is required to store scanned answer sheets.');
         });
       });

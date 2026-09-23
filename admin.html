@@ -64,29 +64,29 @@
       <div id="u-msg"></div>
       <div class="card">
         <h2>1 · Candidates</h2>
-        <p class="hint">Columns: <code>exam_taker_id, username, password, full_name, present_post, promotion_post, promotion_grade_level, exam_location</code></p>
-        <input type="file" id="f-cand" accept=".csv" class="panel-input">
+        <p class="hint">Columns: <code>exam_taker_id, username, password, full_name, present_post, promotion_post, promotion_grade_level, exam_location</code> (.csv or .xlsx accepted)</p>
+        <input type="file" id="f-cand" accept=".csv,.xlsx,.xls" class="panel-input">
         <button class="btn small" style="margin-top:10px" data-up="candidates" data-file="f-cand">Upload candidates</button>
         <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/candidates.csv" download>Sample</a>
       </div>
       <div class="card">
         <h2>2 · Question assignment</h2>
         <p class="hint">Either <code>exam_taker_id, question_id</code> (one per row) or <code>exam_taker_id, question_ids</code> (space/comma separated).</p>
-        <input type="file" id="f-assign" accept=".csv" class="panel-input">
+        <input type="file" id="f-assign" accept=".csv,.xlsx,.xls" class="panel-input">
         <button class="btn small" style="margin-top:10px" data-up="assign" data-file="f-assign">Upload assignment</button>
         <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/assignment.csv" download>Sample</a>
       </div>
       <div class="card">
         <h2>3 · Questions bank</h2>
-        <p class="hint">Columns: <code>question_id, area, question_text, option_a, option_b, option_c, option_d, correct_answer, marks</code>. Use the area names in the blueprint (Professional, Current Affairs, English Language, ASCON/Public Service Rules, Financial Regulation).</p>
-        <input type="file" id="f-q" accept=".csv" class="panel-input">
+        <p class="hint">Columns: <code>question_id, area, question_text, option_a, option_b, option_c, option_d, correct_answer, marks</code>. You can upload a <b>.csv</b> or <b>.xlsx</b> (Excel) file. Use the area names in the blueprint (Professional, Current Affairs, English Language, ASCON/Public Service Rules, Financial Regulation).</p>
+        <input type="file" id="f-q" accept=".csv,.xlsx,.xls" class="panel-input">
         <button class="btn small" style="margin-top:10px" data-up="questions" data-file="f-q">Upload questions</button>
         <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/questions.csv" download>Sample</a>
       </div>
       <div class="card">
         <h2>4 · Theory (Part B) questions</h2>
         <p class="hint">Columns: <code>theory_id, number, prompt, model_answer, max_marks</code>. The model answer is used by markers and is never shown to candidates.</p>
-        <input type="file" id="f-theory" accept=".csv" class="panel-input">
+        <input type="file" id="f-theory" accept=".csv,.xlsx,.xls" class="panel-input">
         <button class="btn small" style="margin-top:10px" data-up="theory" data-file="f-theory">Upload theory questions</button>
         <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/theory-questions.csv" download>Sample</a>
       </div>
@@ -174,6 +174,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script src="assets/common.js"></script>
 <script>
@@ -272,19 +273,32 @@
   document.querySelectorAll('[data-up]').forEach(function(btn){
     btn.onclick=function(){
       var kind=btn.dataset.up, fileEl=document.getElementById(btn.dataset.file);
-      if(!fileEl.files[0]){ msg('u-msg','Please choose a file first.',true); return; }
+      var file=fileEl.files[0];
+      if(!file){ msg('u-msg','Please choose a file first.',true); return; }
+      var actionMap={candidates:'uploadCandidates',assign:'uploadAssign',questions:'uploadQuestions',theory:'uploadTheory'};
+      var action=actionMap[kind];
+      var isXlsx=/\.xlsx?$/i.test(file.name);
+      if(isXlsx && (typeof XLSX==='undefined')){ msg('u-msg','Excel support did not load. Please try again or upload the CSV version.',true); return; }
       var reader=new FileReader();
       reader.onload=function(){
-        var rows=A.parseCSV(reader.result);
-        var actionMap={candidates:'uploadCandidates',assign:'uploadAssign',questions:'uploadQuestions',theory:'uploadTheory'};
-        var action=actionMap[kind];
+        var rows;
+        try{
+          if(isXlsx){
+            var wb=XLSX.read(new Uint8Array(reader.result),{type:'array'});
+            var ws=wb.Sheets[wb.SheetNames[0]];
+            rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});   // header row -> keys
+          } else {
+            rows=A.parseCSV(reader.result);
+          }
+        } catch(err){ msg('u-msg','Could not read the file: '+err.message,true); return; }
+        if(!rows||!rows.length){ msg('u-msg','No rows found in the file. Check that the first row has the column headers.',true); return; }
         btn.disabled=true; btn.textContent='Uploading…';
         A.api(action,{token:T.token, rows:rows}).then(function(r){
           msg('u-msg','Processed '+r.processed+' row(s).',false);
         }).catch(function(e){ msg('u-msg',e.message,true); })
           .finally(function(){ btn.disabled=false; btn.textContent='Upload '+kind; });
       };
-      reader.readAsText(fileEl.files[0]);
+      if(isXlsx) reader.readAsArrayBuffer(file); else reader.readAsText(file);
     };
   });
 

@@ -58,7 +58,9 @@ input:focus{outline:none;border-color:var(--gold)}
 .uploadprog{margin-top:12px}
 .uploadbar{height:16px;background:#e6ecf5;border-radius:999px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.08)}
 .uploadbar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--green,#08713d),#12a05a);border-radius:999px;transition:width .25s ease}
-.uploadbar-fill.err{background:linear-gradient(90deg,#c0392b,#e74c3c)}
+.uploadbar-fill.busy{background-image:linear-gradient(90deg,var(--green,#08713d),#12a05a,#4bd58a,#12a05a,var(--green,#08713d));background-size:200% 100%;animation:uploadshimmer 1.1s linear infinite}
+@keyframes uploadshimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.uploadbar-fill.err{background:linear-gradient(90deg,#c0392b,#e74c3c);animation:none}
 #th-proglbl{margin-top:6px;font-weight:700}
 
 /* ---- exam ---- */
