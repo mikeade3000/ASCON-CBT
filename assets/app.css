@@ -62,6 +62,7 @@ input:focus{outline:none;border-color:var(--gold)}
 @keyframes uploadshimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .uploadbar-fill.err{background:linear-gradient(90deg,#c0392b,#e74c3c);animation:none}
 #th-proglbl{margin-top:6px;font-weight:700}
+.scorebox{display:inline-block;margin:14px auto;padding:14px 28px;border-radius:14px;background:#e5f6ec;color:#0b5b34;border:2px solid #08713d;font-size:26px;font-weight:800}
 
 /* ---- exam ---- */
 .examwrap{max-width:1000px;margin:0 auto;padding:0 16px 60px}
