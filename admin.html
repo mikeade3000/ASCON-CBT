@@ -90,6 +90,13 @@
         <button class="btn small" style="margin-top:10px" data-up="theory" data-file="f-theory">Upload theory questions</button>
         <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/theory-questions.csv" download>Sample</a>
       </div>
+      <div class="card">
+        <h2>5 · Theory (Part B) assignment</h2>
+        <p class="hint">Give different candidates different Theory papers. Columns: <code>exam_taker_id, theory_ids</code> (space- or comma-separated theory_ids). Leave this out and every candidate gets the whole theory set.</p>
+        <input type="file" id="f-theoryassign" accept=".csv,.xlsx,.xls" class="panel-input">
+        <button class="btn small" style="margin-top:10px" data-up="theoryassign" data-file="f-theoryassign">Upload theory assignment</button>
+        <a class="btn small" style="margin-top:10px;background:#eef2fa;color:var(--navy2)" href="samples/theory-assignment.csv" download>Sample</a>
+      </div>
     </div>
 
     <div id="t-results" class="tabpage hidden">
@@ -120,6 +127,7 @@
         <label class="fld">Scheduled start (leave blank to open immediately)</label><input id="set-start" class="panel-input" type="datetime-local">
         <label class="fld"><input id="set-loc" type="checkbox"> Require location capture</label>
         <label class="fld"><input id="set-shuffle" type="checkbox"> Shuffle questions per candidate</label>
+        <label class="fld"><input id="set-reveal" type="checkbox"> Show each candidate their MCQ score at the end</label>
         <label class="fld">Instructions (HTML)</label><textarea id="set-ins" class="panel-input" style="min-height:120px"></textarea>
         <label class="fld">Terms (HTML)</label><textarea id="set-terms" class="panel-input" style="min-height:100px"></textarea>
       </div>
@@ -133,6 +141,8 @@
       <div class="card">
         <h2>Part B — Theory</h2>
         <label class="fld"><input id="set-theory-on" type="checkbox"> Enable Theory (Part B) after the MCQ</label>
+        <label class="fld"><input id="set-theory-upload" type="checkbox"> Allow candidates to upload scanned answer sheets</label>
+        <label class="fld"><input id="set-theory-sheet" type="checkbox"> Allow candidates to download / print the answer sheet</label>
         <label class="fld">Theory duration (minutes)</label><input id="set-theory-dur" class="panel-input" type="number" min="1">
         <label class="fld">Theory instructions (HTML)</label><textarea id="set-theory-ins" class="panel-input" style="min-height:110px"></textarea>
       </div>
@@ -179,7 +189,9 @@
 <script src="assets/common.js"></script>
 <script>
 (function(){
-  var A=window.ASCON, esc=A.esc, T={token:null, role:null};
+  var A=window.ASCON;
+  if(!A){ document.body.innerHTML='<div style="font-family:sans-serif;max-width:640px;margin:60px auto;padding:24px;color:#08713d;text-align:center"><h2>Could not finish loading</h2><p style="color:#333">A required file (<b>assets/common.js</b>) did not load. Please <b>refresh</b> this page (Ctrl+Shift+R), and confirm the <b>assets</b> folder (with common.js) is uploaded to the site.</p></div>'; throw new Error('ASCON/common.js not loaded'); }
+  var esc=A.esc, T={token:null, role:null};
   var monTimer=null;
 
   if(!A.configured()){ document.querySelector('#login .authcard').innerHTML='<h1>Not configured</h1><p class="hint">Set your Apps Script URL in config.js first.</p>'; return; }
@@ -275,7 +287,7 @@
       var kind=btn.dataset.up, fileEl=document.getElementById(btn.dataset.file);
       var file=fileEl.files[0];
       if(!file){ msg('u-msg','Please choose a file first.',true); return; }
-      var actionMap={candidates:'uploadCandidates',assign:'uploadAssign',questions:'uploadQuestions',theory:'uploadTheory'};
+      var actionMap={candidates:'uploadCandidates',assign:'uploadAssign',questions:'uploadQuestions',theory:'uploadTheory',theoryassign:'uploadTheoryAssign'};
       var action=actionMap[kind];
       var isXlsx=/\.xlsx?$/i.test(file.name);
       if(isXlsx && (typeof XLSX==='undefined')){ msg('u-msg','Excel support did not load. Please try again or upload the CSV version.',true); return; }
@@ -336,16 +348,17 @@
   /* ---- theory marking ---- */
   function loadMarking(){
     A.api('marking',{token:T.token}).then(function(r){
-      var qs=r.questions||[];
+      var hasBank=!!r.has_bank;
       var box=document.getElementById('mk-list');
       if(!r.rows.length){
         box.innerHTML='<div class="card hint">No candidate has submitted or uploaded any Theory (Part B) answer sheets yet.'+
-          (qs.length?'':' <br><br>Tip: you can also upload the theory question set (with model answers) under <b>Uploads → Theory (Part B) questions</b> to enable per-question marking.')+'</div>';
+          (hasBank?'':' <br><br>Tip: you can also upload the theory question set (with model answers) under <b>Uploads → Theory (Part B) questions</b> to enable per-question marking.')+'</div>';
         return;
       }
-      var banner = qs.length ? '' :
+      var banner = hasBank ? '' :
         '<div class="card" style="border-left:4px solid var(--gold)"><b>No theory question set uploaded.</b> You can still open each candidate’s scanned pages below and enter an <b>overall</b> Part B mark. To mark question-by-question against model answers, upload the set under <b>Uploads → Theory (Part B) questions</b>.</div>';
       var html=r.rows.map(function(c){
+        var qs=c.questions||[];   // this candidate's OWN assigned theory questions
         var scans=(c.scans||[]).map(function(s){ return '<a class="btn small" target="_blank" href="'+esc(s.url)+'">Page '+(s.page||'')+'</a>'; }).join(' ') || '<span class="hint">no pages uploaded</span>';
         var body, curTotal=(c.theory_total!==''&&c.theory_total!=null)?c.theory_total:'';
         if(qs.length){
@@ -392,9 +405,12 @@
       document.getElementById('set-start').value=s.scheduled_start?toLocalInput(s.scheduled_start):'';
       document.getElementById('set-loc').checked=s.require_location!=='0';
       document.getElementById('set-shuffle').checked=s.shuffle_questions!=='0';
+      document.getElementById('set-reveal').checked=s.reveal_mcq_score!=='0';
       document.getElementById('set-ins').value=s.instructions_html||'';
       document.getElementById('set-terms').value=s.terms_html||'';
       document.getElementById('set-theory-on').checked=s.theory_enabled!=='0';
+      document.getElementById('set-theory-upload').checked=s.theory_upload_enabled!=='0';
+      document.getElementById('set-theory-sheet').checked=s.theory_sheet_enabled!=='0';
       document.getElementById('set-theory-dur').value=s.theory_duration_minutes||60;
       document.getElementById('set-theory-ins').value=s.theory_instructions_html||'';
       var bp=[]; try{ bp=JSON.parse(s.area_blueprint||'[]'); }catch(e){}
@@ -436,10 +452,13 @@
       scheduled_start:startVal?new Date(startVal).toISOString():'',
       require_location:document.getElementById('set-loc').checked?'1':'0',
       shuffle_questions:document.getElementById('set-shuffle').checked?'1':'0',
+      reveal_mcq_score:document.getElementById('set-reveal').checked?'1':'0',
       instructions_html:document.getElementById('set-ins').value,
       terms_html:document.getElementById('set-terms').value,
       area_blueprint:JSON.stringify(bp),
       theory_enabled:document.getElementById('set-theory-on').checked?'1':'0',
+      theory_upload_enabled:document.getElementById('set-theory-upload').checked?'1':'0',
+      theory_sheet_enabled:document.getElementById('set-theory-sheet').checked?'1':'0',
       theory_duration_minutes:String(parseInt(document.getElementById('set-theory-dur').value||'60',10)),
       theory_instructions_html:document.getElementById('set-theory-ins').value
     };

@@ -33,7 +33,9 @@
 <script src="assets/common.js"></script>
 <script>
 (function(){
-  var A=window.ASCON, esc=A.esc;
+  var A=window.ASCON;
+  if(!A){ document.body.innerHTML='<div style="font-family:sans-serif;max-width:640px;margin:60px auto;padding:24px;color:#08713d;text-align:center"><h2>Could not finish loading</h2><p style="color:#333">A required file (<b>assets/common.js</b>) did not load. Please <b>refresh</b> this page (Ctrl+Shift+R), and confirm the <b>assets</b> folder is uploaded.</p></div>'; throw new Error('ASCON/common.js not loaded'); }
+  var esc=A.esc;
   var token=new URLSearchParams(location.search).get('t')||'';
   if(!A.configured()){ document.getElementById('obody').classList.add('hidden'); document.querySelector('.container').innerHTML='<div class="card"><h1>Not configured</h1></div>'; return; }
   if(!token){ document.getElementById('obad').classList.remove('hidden'); return; }

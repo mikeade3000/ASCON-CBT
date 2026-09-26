@@ -131,24 +131,7 @@
   </div>
 </section>
 
-<!-- 8. THEORY INSTRUCTIONS -->
-<section id="s-theoryinfo" class="stage hidden">
-  <div class="panel">
-    <h1>Theory — Part B</h1>
-    <div id="th-html" class="content-html"></div>
-    <div class="detail"><div class="k">Duration</div><div class="v" id="th-duration"></div></div>
-    <label class="big-label">Your answer sheet</label>
-    <p class="note">Write your answers by hand on the official ASCON answer sheet, then scan or photograph each page and upload it here.</p>
-    <button id="b-sheet" class="btn" style="background:#13315c">⬇ Download / print the answer sheet</button>
-    <div id="th-countwrap" class="hidden">
-      <label class="big-label" style="text-align:center">Theory begins in</label>
-      <div class="countdown" id="th-countdown">--:--</div>
-    </div>
-    <button id="b-theory-start" class="btn gold">Start Theory (Part B)</button>
-  </div>
-</section>
-
-<!-- 9. THEORY — SCAN & UPLOAD -->
+<!-- 8. THEORY — TIMED: questions + countdown + scan upload -->
 <section id="s-theory" class="hidden">
   <div class="topbar">
     <img class="topbar-logo" src="assets/logo.png" alt="ASCON">
@@ -159,12 +142,16 @@
   <div class="examwrap">
     <div id="th-warn" class="warnbanner hidden"></div>
     <div class="qcard">
+      <div id="th-html" class="content-html"></div>
+      <button id="b-sheet" class="btn" style="background:#13315c;margin-top:10px">⬇ Download / print the answer sheet</button>
+    </div>
+    <div class="qcard">
       <h2 style="margin-top:0">Questions</h2>
       <div id="th-questions" class="content-html"></div>
     </div>
-    <div class="qcard">
+    <div class="qcard" id="th-uploadcard">
       <h2 style="margin-top:0">Upload your answer sheets</h2>
-      <p class="note">Take a clear photo of each written page and upload it. You can upload several pages.</p>
+      <p class="note">Take a clear photo of each written page and upload it. You can upload several pages before the time runs out.</p>
       <input id="th-file" type="file" accept="image/*" capture="environment" multiple style="font-size:17px">
       <div id="th-progress" class="uploadprog hidden">
         <div class="uploadbar"><div id="th-bar" class="uploadbar-fill"></div></div>
@@ -175,12 +162,13 @@
   </div>
 </section>
 
-<!-- 10. ALL DONE -->
+<!-- 9. ALL DONE — MCQ score + Theory being processed -->
 <section id="s-done" class="stage hidden">
   <div class="panel" style="text-align:center">
     <div style="font-size:64px">✅</div>
-    <h1 id="done-title">All submitted</h1>
-    <p class="note" id="done-msg">Your examination has been recorded in full. You may now close this window.</p>
+    <h1 id="done-title">Examination complete</h1>
+    <div id="done-score" class="scorebox hidden"></div>
+    <p class="note" id="done-msg"></p>
   </div>
 </section>
 
@@ -188,7 +176,9 @@
 <script src="assets/common.js"></script>
 <script>
 (function(){
-  var A = window.ASCON, esc = A.esc;
+  var A = window.ASCON;
+  if(!A){ document.body.innerHTML='<div style="font-family:sans-serif;max-width:640px;margin:60px auto;padding:24px;color:#08713d;text-align:center"><h2>Could not finish loading</h2><p style="color:#333">A required file (<b>assets/common.js</b>) did not load. Please <b>refresh</b> this page (Ctrl+Shift+R). If it keeps happening, the administrator should confirm the <b>assets</b> folder (with common.js) is uploaded to the site.</p></div>'; throw new Error('ASCON/common.js not loaded'); }
+  var esc = A.esc;
 
   /* -------- exam-integrity lockdown (deterrent layer) -------- */
   (function lockdown(){
@@ -209,7 +199,7 @@
   var S = {};                 // session state
   var LS_KEY = 'ascon_session';
 
-  function show(id){ ['username','password','instructions','confirm','info','exam','mcqdone','theoryinfo','theory','done']
+  function show(id){ ['username','password','instructions','confirm','info','exam','mcqdone','theory','done']
       .forEach(function(k){ document.getElementById('s-'+k).classList.toggle('hidden', k!==id); }); window.scrollTo(0,0); }
   function err(id,msg){ var el=document.getElementById('e-'+id); el.textContent=msg; el.classList.remove('hidden'); }
   function clearErr(id){ document.getElementById('e-'+id).classList.add('hidden'); }
@@ -238,6 +228,7 @@
     if(!p){ err('password','Please enter your password.'); return; }
     clearErr('password'); this.disabled=true; this.textContent='Signing in…';
     A.api('candidateLogin',{username:S.username,password:p}).then(function(r){
+      if(r && r.attempted){ showAttempted(r); return; }   // already completed -> no re-entry
       S = Object.assign(S, r);
       S.answers = r.saved_answers || {};
       persist();
@@ -245,6 +236,15 @@
     }).catch(function(e){ err('password', e.message); })
       .finally(function(){ var b=document.getElementById('b-password'); b.disabled=false; b.textContent='Sign in'; });
   };
+  function showAttempted(r){
+    try{ localStorage.removeItem(LS_KEY); }catch(e){}
+    document.getElementById('done-title').textContent='You have already attempted this examination';
+    var box=document.getElementById('done-score'), msg=document.getElementById('done-msg');
+    if(r.reveal && r.score!=null){ box.textContent='Part A (MCQ): '+r.score+' / '+r.max_score; box.classList.remove('hidden'); }
+    else { box.classList.add('hidden'); box.textContent=''; }
+    msg.textContent='Our records show you have already completed this examination. You cannot take it again. You may close this window.';
+    show('done');
+  }
   document.getElementById('p').addEventListener('keydown',function(e){ if(e.key==='Enter') document.getElementById('b-password').click(); });
 
   function enterFromStep(step){
@@ -436,48 +436,48 @@
   /* ---------- 7. MCQ done -> Theory Part B hand-off ---------- */
   function afterMcq(){
     phase='mcqdone'; clearTimeout(syncTimer); clearInterval(tickTimer);
-    var toTheory=document.getElementById('mcq-next-theory'), only=document.getElementById('mcq-only');
-    if(S.theory_enabled){ toTheory.classList.remove('hidden'); only.classList.add('hidden'); }
-    else { toTheory.classList.add('hidden'); only.classList.remove('hidden'); }
-    show('mcqdone');
+    if(S.theory_enabled){
+      document.getElementById('mcq-next-theory').classList.remove('hidden');
+      document.getElementById('mcq-only').classList.add('hidden');
+      show('mcqdone');
+    } else {
+      showFinal('mcqonly');   // no Part B -> straight to the result screen
+    }
   }
   document.getElementById('b-to-theory').onclick=function(){
+    if(!confirm('You are about to begin Theory (Part B). The timer will start now and cannot be paused. Continue?')) return;
     var b=this; b.disabled=true; b.textContent='Loading…';
     A.api('theoryInfo',{token:S.token}).then(function(r){
       S.theory=r;
-      if(r.theory_step==='theory_submitted'){ finishAll(); return; }
-      fillTheoryInfo(r);
-      if(r.theory_step==='theory'){ startTheory(true); } else { show('theoryinfo'); }
+      if(r.theory_step==='theory_submitted'){ showFinal('theory'); return; }
+      // start (or resume) the timer, then show the timed screen with questions + countdown
+      return A.api('theoryStart',{token:S.token}).then(function(t){
+        S.theory.theory_started_at=t.started_at; S.theory.remaining=t.remaining;
+        startTheory(r.theory_step==='theory');
+      });
     }).catch(function(e){ alert(e.message); }).finally(function(){ b.disabled=false; b.textContent='Proceed to Theory (Part B) →'; });
   };
 
-  /* ---------- 8. Theory instructions + answer sheet ---------- */
-  function fillTheoryInfo(r){
-    document.getElementById('th-html').innerHTML = r.instructions_html||'';
-    document.getElementById('th-duration').textContent = (r.duration_minutes||60)+' minutes';
-  }
   document.getElementById('b-sheet').onclick=function(){ printAnswerSheet(); };
-  document.getElementById('b-theory-start').onclick=function(){
-    var b=this; b.disabled=true; b.textContent='Starting…';
-    A.api('theoryStart',{token:S.token}).then(function(r){
-      S.theory.theory_started_at=r.started_at; S.theory.remaining=r.remaining;
-      startTheory(false);
-    }).catch(function(e){ alert(e.message); }).finally(function(){ b.disabled=false; b.textContent='Start Theory (Part B)'; });
-  };
 
-  /* ---------- 9. Theory scanning ---------- */
+  /* ---------- 8. Theory: questions + countdown + scanning ---------- */
   var thTick=null, thRemaining=0, thScans=[];
   function startTheory(resume){
     phase='theory';
-    bindFocus();   // proctor Part B too (covers the resume-straight-to-theory path); phase gates the sync
+    bindFocus();   // proctor Part B too; phase gates the sync
     show('theory');
     var p=(S.theory.profile)||{};
     document.getElementById('th-id').textContent = p.exam_taker_id||'';
-    // questions
+    document.getElementById('th-html').innerHTML = S.theory.instructions_html||'';
     var qhtml=(S.theory.questions||[]).map(function(q){
       return '<p><b>Q'+esc(q.number)+'.</b> '+esc(q.prompt)+' <span class="hint">('+q.max_marks+' marks)</span></p>';
     }).join('') || '<p class="hint">Refer to your printed question paper.</p>';
     document.getElementById('th-questions').innerHTML=qhtml;
+    // Point 1: respect admin toggles for answer-sheet download and scan upload
+    var sheetBtn=document.getElementById('b-sheet');
+    sheetBtn.style.display = (S.theory.sheet_enabled===false) ? 'none' : '';
+    var uploadCard=document.getElementById('th-uploadcard');
+    if(uploadCard) uploadCard.style.display = (S.theory.upload_enabled===false) ? 'none' : '';
     thScans = (S.theory.scans||[]).slice();
     renderScans();
     var dur=(S.theory.duration_minutes||60)*60;
@@ -558,14 +558,33 @@
   function doTheorySubmit(auto){
     if(theorySubmitting) return; theorySubmitting=true;
     if(thTick) clearInterval(thTick);
-    A.api('theorySubmit',{token:S.token}).then(function(){ finishAll(); })
+    A.api('theorySubmit',{token:S.token}).then(function(){ showFinal('theory'); })
       .catch(function(e){ theorySubmitting=false; alert('Submit failed: '+e.message); });
   }
 
-  function finishAll(){
-    document.getElementById('done-title').textContent='All submitted';
-    document.getElementById('done-msg').textContent='Your examination — Part A (MCQ) and Part B (Theory) — has been recorded in full. You may now close this window.';
+  // End of exam: show the candidate their MCQ score (if the admin allows it) and,
+  // when Part B was taken, tell them the Theory result is being processed.
+  function showFinal(context){
+    document.getElementById('done-title').textContent='Examination complete';
+    var box=document.getElementById('done-score'), msg=document.getElementById('done-msg');
+    box.classList.add('hidden'); box.textContent=''; msg.textContent='Recording your submission…';
     show('done');
+    A.api('mcqScore',{token:S.token}).then(function(r){
+      if(r && r.reveal && r.score!=null){
+        box.textContent='Part A (MCQ): '+r.score+' / '+r.max_score;
+        box.classList.remove('hidden');
+      }
+      if(context==='theory'){
+        msg.innerHTML='Your <b>Part B (Theory)</b> answers have been received and are now being processed and marked. '+
+          'Your overall result will be released by the examination office. You may now close this window.';
+      } else {
+        msg.textContent='Your examination has been recorded. You may now close this window.';
+      }
+    }).catch(function(){
+      msg.textContent = (context==='theory')
+        ? 'Your Theory (Part B) answers have been received and are being processed. You may now close this window.'
+        : 'Your examination has been recorded. You may now close this window.';
+    });
   }
 
   // Printable official answer sheet (opens a print window).
